@@ -29,7 +29,7 @@ export async function api(path, { method = 'GET', body, signal, query } = {}) {
     res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined, signal });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new ApiError(0, 'network', 'Cannot reach the ThyTube server.');
+    throw new ApiError(0, 'network', 'Cannot reach the ThyTube server. Art thou on thy home network?');
   }
   let data = null;
   const text = await res.text();

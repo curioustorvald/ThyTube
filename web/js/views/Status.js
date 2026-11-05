@@ -3,6 +3,7 @@ import { get, post } from '../api.js';
 import { Confirm } from '../components/Dialog.js';
 import { healthState } from '../components/StatusPill.js';
 import { Icon } from '../icons.js';
+import { isIOS, isStandalone, promptInstall } from '../pwa.js';
 import { toast, toastError, useStore } from '../store.js';
 import { ago, fmtBytes, fmtTime } from '../util.js';
 
@@ -30,10 +31,27 @@ function Events() {
   </section>`;
 }
 
+function AppCard() {
+  const canInstall = useStore((s) => s.canInstall);
+  let body;
+  if (isStandalone()) body = html`<p class="small">Thou art using ThyTube as an installed app.</p>`;
+  else if (canInstall) body = html`<p class="small">Install ThyTube on this device: it opens in its own window and its icon sits beside thine other apps.</p>
+    <div><button class="small primary" onClick=${promptInstall}><${Icon} name="download" size="16" /> Install ThyTube</button></div>`;
+  else if (isIOS()) body = html`<p class="small">To install on this device, tap the Share button in Safari, then <strong>Add to Home Screen</strong>.</p>`;
+  else if (!window.isSecureContext) body = html`<p class="small">Thy browser only offers to install ThyTube (and keeps it usable offline) when the server is reached over HTTPS. The README explains how to set that up on thy LAN; until then, thy browser's “Add to Home screen” still makes a shortcut.</p>`;
+  else body = html`<p class="small">Use thy browser's menu to install ThyTube (“Install app” or “Add to Home screen”).</p>`;
+  return html`<div class="card stack"><h2 class="row"><${Icon} name="phone" size="20" /> App</h2>${body}</div>`;
+}
+
 export function Status() {
   const status = useStore((s) => s.status);
+  const statusError = useStore((s) => s.statusError);
   const [confirmRollback, setConfirmRollback] = useState(false);
-  if (!status) return html`<p class="muted">Loading…</p>`;
+  if (!status) {
+    return statusError
+      ? html`<div class="stack"><div class="error-box">${statusError}</div><${AppCard} /></div>`
+      : html`<p class="muted">Loading…</p>`;
+  }
   const h = status.health;
   const hs = healthState(status);
   const y = status.ytdlp;
@@ -80,6 +98,7 @@ export function Status() {
         <a class="small" href="#/manage/queue">Open the queue</a>
       </div>
     </div>
+    <${AppCard} />
     <${Events} />
     ${confirmRollback && html`<${Confirm} title="Roll back yt-dlp?" confirmLabel="Roll back" onClose=${() => setConfirmRollback(false)}
       onConfirm=${() => admin('/admin/rollback-ytdlp', 'Rolling back…')}

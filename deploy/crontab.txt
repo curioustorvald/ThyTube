@@ -5,6 +5,6 @@ PATH=/usr/local/bin:/usr/bin:/bin
 # Daily yt-dlp update (canary-tested, rolls back automatically). Nightly-ish, off the hour.
 17 4 * * * @ORIGIN@/venv/bin/thytube update-ytdlp >> @ORIGIN@/logs/update-ytdlp.log 2>&1
 
-# Only if you are NOT using the systemd units: keep web + worker running without root.
+# Only if thou art NOT using the systemd units: keep web + worker running without root.
 # @reboot     @ORIGIN@/app/deploy/watchdog.sh
 # */5 * * * * @ORIGIN@/app/deploy/watchdog.sh

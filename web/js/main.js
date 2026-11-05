@@ -3,7 +3,8 @@ import { get } from './api.js';
 import { Avatar, ProfileScreen } from './components/Profiles.js';
 import { StatusPill } from './components/StatusPill.js';
 import { Icon } from './icons.js';
-import { href, useRoute } from './router.js';
+import { go, href, useRoute } from './router.js';
+import { initPwa, isStandalone } from './pwa.js';
 import { store, useStore } from './store.js';
 import { Channel } from './views/Channel.js';
 import { Library } from './views/Library.js';
@@ -60,6 +61,8 @@ function App() {
   if (!profile || pickingProfile) return html`<${ProfileScreen} /><${Toasts} />`;
   return html`<div class="shell">
     <header class="topbar">
+      ${isStandalone() && ['watch', 'channel'].includes(route.parts[0]) && html`<button class="ghost icon" aria-label="Back"
+        onClick=${() => (history.length > 1 ? history.back() : go('/'))}><${Icon} name="back" /></button>`}
       <a class="brand" href="#/"><img src="icon.svg" alt="" />ThyTube</a>
       <span class="spacer"></span>
       <${StatusPill} />
@@ -75,6 +78,7 @@ function App() {
   </div>`;
 }
 
+initPwa();
 const root = document.getElementById('app');
 root.textContent = ''; // Preact doesn't remove the boot placeholder
 render(html`<${App} />`, root);

@@ -40,7 +40,7 @@ export function Channel({ id }) {
           <button class="small" onClick=${() => setEdit(s)}><${Icon} name="edit" size="16" /> Edit rules</button>
           <button class="small" onClick=${() => post(`/subscriptions/${s.id}/poll`).then(() => toast('Checking for new uploads…')).catch(toastError)}>
             <${Icon} name="refresh" size="16" /> Check now</button></div>`)
-      : html`<div class="card row wrap"><span class="grow small muted">Not subscribed. Only videos you cached by hand are here.</span>
+      : html`<div class="card row wrap"><span class="grow small muted">Not subscribed. Only videos thou hast cached by hand are here.</span>
           <button class="small primary" onClick=${() => setEdit('new')}>Cache this creator…</button></div>`}
     <${VideoList} query=${{ channel: id, state: 'cached' }} showChannel=${false}
       emptyText=${html`<p>No cached videos from this channel yet.</p>`} />

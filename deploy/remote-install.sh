@@ -29,6 +29,8 @@ PY="$O/venv/bin/python"
 # Editable install: the package finds app/web next to app/src.
 "$PY" -m pip install -q -e "$O/app"
 TT=("$PY" -m thytube.cli)
+# A changed sw.js makes browsers install a fresh service worker (and a fresh shell cache).
+sed -i "s/^const BUILD = '[^']*';/const BUILD = '$(date -u +%Y%m%d%H%M%S)';/" "$O/app/web/sw.js"
 
 if [ ! -f "$THYTUBE_CONFIG" ]; then
   cp "$O/app/config.example.toml" "$THYTUBE_CONFIG"

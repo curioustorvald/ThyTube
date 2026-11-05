@@ -8,7 +8,7 @@ import { go, href } from '../router.js';
 import { prefs, setPref, store, toast, toastError, useStore } from '../store.js';
 import { fmtBytes, fmtDate, fmtDuration, parseTimestamp, STATE_LABEL } from '../util.js';
 
-const MODES = [['channel', 'Shuffle channel', 'shuffle'], ['queue', 'My queue', 'list'], ['repeat', 'Repeat', 'repeat'], ['off', 'Stop', 'stop']];
+const MODES = [['channel', 'Shuffle channel', 'shuffle'], ['queue', 'Thy queue', 'list'], ['repeat', 'Repeat', 'repeat'], ['off', 'Stop', 'stop']];
 
 // Session-scoped play history (for "don't repeat until all are used up") and the user-built queue.
 function played() { try { return JSON.parse(sessionStorage.getItem('thytube.played')) || []; } catch { return []; } }
@@ -26,7 +26,7 @@ export function enqueue(v) {
   const q = getQueue().filter((x) => x.id !== v.id);
   q.push({ id: v.id, title: v.title, thumb: v.thumb, duration_s: v.duration_s, channel: v.channel, state: v.state });
   setQueue(q);
-  toast(`Added to your queue (${q.length})`);
+  toast(`Added to thy queue (${q.length})`);
 }
 
 const TS = /(\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b)/;
@@ -79,7 +79,7 @@ function UpNext({ video, mode, setMode, pick, reroll, playNext, queue }) {
           ${queue.length > 6 && html`<p class="small muted">and ${queue.length - 6} more</p>`}
           <div class="row"><button class="small primary" onClick=${playNext}>Play next in queue</button>
             <button class="small" onClick=${() => setQueue([])}>Clear</button></div></div>`
-      : html`<p class="small muted">Your queue is empty. Use “Add to queue” on any video.</p>`)}
+      : html`<p class="small muted">Thy queue is empty. Use “Add to queue” on any video.</p>`)}
   </div>`;
 }
 
@@ -199,7 +199,7 @@ export function Watch({ id }) {
         ${video.duration_s ? html`<span>· ${fmtDuration(video.duration_s)}</span>` : null}
         ${video.height && html`<span>· ${video.height}p</span>`}
         ${video.size_bytes && cached ? html`<span>· ${fmtBytes(video.size_bytes)}</span>` : null}
-        ${video.total_watch_count > 0 && html`<span>· watched ${video.total_watch_count}× (you: ${myCount}×)</span>`}
+        ${video.total_watch_count > 0 && html`<span>· watched ${video.total_watch_count}× (by thee: ${myCount}×)</span>`}
       </div>
       <${VideoBadges} v=${video} />
       <div class="row wrap" style="margin:0.7rem 0">
@@ -216,7 +216,7 @@ export function Watch({ id }) {
       <${Chapters} chapters=${video.chapters} t=${t} onSeek=${seek} />
     </aside>
     ${confirmDelete && html`<${Confirm} title="Remove the cached file?" danger confirmLabel="Remove"
-      message="The video stays in your library (with its thumbnail) and can be cached again later."
+      message="The video stays in thy library (with its thumbnail) and can be cached again later."
       onConfirm=${deleteFiles} onClose=${() => setConfirmDelete(false)} />`}
   </div>`;
 }

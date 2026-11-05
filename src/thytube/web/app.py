@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -14,6 +15,9 @@ from .. import __version__
 from ..config import Config
 from .common import ApiError
 from .routes import manage, system, videos
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+mimetypes.add_type("text/vtt", ".vtt")
 
 
 def _error(status: int, code: str, message: str, **extra: Any) -> JSONResponse:

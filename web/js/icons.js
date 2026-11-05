@@ -3,6 +3,8 @@ import { html } from '../vendor/preact-htm.js';
 
 const P = {
   library: 'M4 5h16M4 12h16M4 19h10',
+  back: 'M15 5l-7 7 7 7',
+  phone: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
   search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4',
   manage: 'M4 7h10M18 7h2M4 17h4M12 17h8M14 4v6M8 14v6',
   status: 'M3 12h4l3-7 4 14 3-7h4',
