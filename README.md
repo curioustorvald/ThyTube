@@ -1,4 +1,4 @@
-<p align="center"><img src="web/icons/icon-192.png" width="96" height="96" alt=""></p>
+<p align="center"><img src="web/img/icon-192.png" width="96" height="96" alt=""></p>
 
 <h1 align="center">ThyTube</h1>
 
@@ -193,4 +193,4 @@ The Status page explains the present state in plain words. What thou canst do, r
 ## Why "thy"?
 
 Because it is **thine**. Thy server, thy disk, thy subscriptions, thy business. Nobody else's
-algorithm decides what thou watchest next.
+algorithm decides what thou watchest next. Thou shalt not be tracked.
