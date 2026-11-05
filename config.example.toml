@@ -3,7 +3,8 @@
 # (paths are placeholders). Sizes are bytes, durations are as named.
 
 [paths]
-origin = "/path/to/thytube"        # app home: data/, ytdlp/, logs/, run/, cookies.txt
+origin = "/path/to/thytube"        # app home: data/, ytdlp/, logs/, run/, cookies.txt (use absolute paths;
+                                   # relative ones are resolved against this file's directory)
 pool = "/path/to/media-pool"       # media/, channels/, .partial/ (must be one filesystem)
 web = ""                           # static frontend dir; "" = <app>/web
 

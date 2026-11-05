@@ -85,3 +85,15 @@ def test_parse_progress() -> None:
     p = parse_progress("[thytube-progress] 100 NA 1000 2048.5 3 137")
     assert p is not None and p.downloaded == 100 and p.total == 1000 and p.eta == 3
     assert parse_progress("[download] 5%") is None
+
+
+def test_relative_paths_resolve_against_config_dir(tmp_path: Path, monkeypatch) -> None:
+    conf_dir = tmp_path / "etc"
+    conf_dir.mkdir()
+    (conf_dir / "config.toml").write_text('[paths]\norigin = "app"\npool = "../media"\n')
+    monkeypatch.chdir(tmp_path)  # a cwd that differs from the config's directory
+    c = config_mod.load(conf_dir / "config.toml")
+    assert c.paths.origin == str(conf_dir / "app")
+    assert c.paths.pool == str(tmp_path / "media")
+    c = config_mod.load(str(conf_dir / "config.toml"))
+    assert c.origin.is_absolute()

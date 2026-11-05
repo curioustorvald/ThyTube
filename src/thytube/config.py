@@ -248,21 +248,29 @@ def load(path: str | os.PathLike[str] | None = None) -> Config:
         raise ConfigError(f"config file not found: {p}") from None
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"{p}: {e}") from None
-    cfg = from_dict(data)
+    cfg = from_dict(data, base=p.resolve().parent)
     cfg.source = str(p)
     return cfg
 
 
-def from_dict(data: dict[str, Any]) -> Config:
+def from_dict(data: dict[str, Any], base: Path | None = None) -> Config:
+    """Relative paths are resolved against ``base`` (the config file's directory), never against
+    the current directory: services and cron jobs start in arbitrary places, and a path such as
+    "var/lib/app" would otherwise silently create a second app tree under whatever the cwd is."""
     cfg: Config = _build(Config, data, "root")
-    # Relative paths are relative to the current directory; normalise them.
-    cfg.paths.origin = str(Path(cfg.paths.origin).expanduser().absolute()) if cfg.paths.origin else ""
-    cfg.paths.pool = str(Path(cfg.paths.pool).expanduser().absolute()) if cfg.paths.pool else ""
+    root = base or Path.cwd()
+
+    def resolve(v: str) -> str:
+        p = Path(v).expanduser()
+        return str(p if p.is_absolute() else (root / p).resolve())
+
+    cfg.paths.origin = resolve(cfg.paths.origin) if cfg.paths.origin else ""
+    cfg.paths.pool = resolve(cfg.paths.pool) if cfg.paths.pool else ""
     if cfg.paths.web:
-        cfg.paths.web = str(Path(cfg.paths.web).expanduser().absolute())
+        cfg.paths.web = resolve(cfg.paths.web)
     if cfg.ytdlp.binary:
-        cfg.ytdlp.binary = str(Path(cfg.ytdlp.binary).expanduser().absolute())
+        cfg.ytdlp.binary = resolve(cfg.ytdlp.binary)
     if cfg.ytdlp.cookies:
-        cfg.ytdlp.cookies = str(Path(cfg.ytdlp.cookies).expanduser().absolute())
+        cfg.ytdlp.cookies = resolve(cfg.ytdlp.cookies)
     validate(cfg)
     return cfg
