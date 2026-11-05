@@ -1,0 +1,6 @@
+[youtube] abcdefghijk: Downloading player 3d3ba064-main
+WARNING: [youtube] abcdefghijk: nsig extraction failed: Some formats may be missing
+         Install PhantomJS to workaround the issue. Please download it from https://phantomjs.org/download.html
+         n = qD4pDPrAz9xq5Wf ; player = https://www.youtube.com/s/player/3d3ba064/player_ias.vflset/en_US/base.js
+WARNING: [youtube] abcdefghijk: Some web client https formats have been skipped as they are missing a url. YouTube is forcing SABR streaming for this client.
+ERROR: [youtube] abcdefghijk: Requested format is not available. Use --list-formats for a list of available formats

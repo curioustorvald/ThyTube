@@ -1,0 +1,3 @@
+[download]   0.0% of  120.05MiB at  Unknown B/s ETA Unknown
+[download] Got error: HTTP Error 403: Forbidden. Retrying fragment 1 (1/10)...
+ERROR: fragment 1 not found, unable to continue

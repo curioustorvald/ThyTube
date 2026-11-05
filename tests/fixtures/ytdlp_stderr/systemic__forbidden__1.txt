@@ -1,0 +1,3 @@
+[info] abcdefghijk: Downloading 1 format(s): 137+140
+[download] Destination: /pool/.partial/abcdefghijk/video.f137.mp4
+ERROR: unable to download video data: HTTP Error 403: Forbidden

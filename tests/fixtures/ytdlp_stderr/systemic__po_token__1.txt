@@ -1,0 +1,3 @@
+[youtube] abcdefghijk: Downloading ios player API JSON
+WARNING: [youtube] abcdefghijk: ios client https formats require a GVS PO Token which was not provided. They will be skipped as they may yield HTTP Error 403. You can manually pass a GVS PO Token for this client with --extractor-args "youtube:po_token=ios.gvs+XXX". For more information, refer to  https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
+ERROR: [youtube] abcdefghijk: Requested format is not available. Use --list-formats for a list of available formats

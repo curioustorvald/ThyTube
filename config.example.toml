@@ -1,0 +1,70 @@
+# ThyTube configuration — copy to config.toml (git-ignored) and adjust.
+# Every key is optional except paths.origin and paths.pool; the values shown are the defaults
+# (paths are placeholders). Sizes are bytes, durations are as named.
+
+[paths]
+origin = "/path/to/thytube"        # app home: data/, ytdlp/, logs/, run/, cookies.txt
+pool = "/path/to/media-pool"       # media/, channels/, .partial/ (must be one filesystem)
+web = ""                           # static frontend dir; "" = <app>/web
+
+[server]
+host = "127.0.0.1"
+port = 8470                        # pick a free local port; Apache proxies to it
+serve_media = false                # dev only: let FastAPI serve /media (Apache does this in production)
+serve_static = false               # dev only: let FastAPI serve the frontend
+
+[pool]
+max_bytes = 1_000_000_000_000      # hard budget for cached media (1000 GB)
+min_free_bytes = 50_000_000_000    # always leave this much free on the pool filesystem
+max_pinned_ratio = 0.5             # pinned videos may use at most this share of max_bytes
+reservation_factor = 1.15          # reserve estimate × this before each download
+# Used when yt-dlp gives no size estimate: duration × bits/s for the height cap.
+bitrate_ceiling = { "360" = 1_200_000, "480" = 2_000_000, "720" = 4_000_000, "1080" = 8_000_000 }
+
+[eviction]
+grace_days = 14                    # unwatched downloads younger than this are protected
+
+[ytdlp]
+binary = ""                        # "" = <origin>/ytdlp/current/bin/yt-dlp (managed by update-ytdlp)
+channel = "stable"                 # "stable" or "nightly" (nightly often fixes YouTube breakage sooner)
+js_runtime = "node"                # JS runtime for YouTube's challenges (yt-dlp-ejs); deno is yt-dlp's default
+cookies = ""                       # last resort, OFF by default — see README "Escalation". Account risk!
+max_height = 1080
+sleep_requests = 1.0               # polite pacing between extraction requests
+sleep_interval = 5                 # random sleep before each download: [sleep_interval, max_sleep_interval]
+max_sleep_interval = 20
+retries = 5
+fragment_retries = 10
+concurrency = 1                    # parallel downloads
+max_attempts = 5                   # non-systemic failures before a video is marked failed
+metadata_timeout_s = 180
+download_timeout_s = 14400
+search_timeout_s = 45
+keep_venvs = 3
+extra_pip_packages = []            # e.g. a PO-token provider plugin; installed into every new yt-dlp venv
+
+[discovery]
+interval_minutes = 120             # how often each subscription's channel is polled (jittered)
+jitter_minutes = 15
+flat_listing_limit = 50            # uploads fetched for the filter preview / RSS fallback
+rss_url_template = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+http_timeout_s = 30
+
+[subtitles]
+langs = ["en", "ko"]
+auto = true                        # also fetch auto-generated captions in the video's own language
+auto_translated = false            # machine-translated auto captions into other languages
+retry_minutes = 60
+max_attempts = 6
+
+[health]
+degraded_after = 2                 # consecutive systemic failures → amber
+blocked_after = 4                  # → red: stop hitting YouTube, run the canary with backoff
+canary_video = "jNQXAC9IVRw"       # a stable, public, short video
+probe_min_backoff_minutes = 15
+probe_max_backoff_hours = 6
+update_on_block_after_hours = 6    # on entering "blocked", update yt-dlp if the last update is older
+
+[watch]
+ratio = 0.5                        # a session counts as a watch after min(ratio × duration, max_seconds)
+max_seconds = 600

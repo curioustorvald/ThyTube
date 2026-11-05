@@ -1,0 +1,2 @@
+[download]  42.1% of  311.20MiB at    2.10MiB/s ETA 01:24
+ERROR: [download] Got error: ('Connection broken: IncompleteRead(1048576 bytes read, 2097152 more expected)', IncompleteRead(1048576 bytes read, 2097152 more expected)). Giving up after 10 retries

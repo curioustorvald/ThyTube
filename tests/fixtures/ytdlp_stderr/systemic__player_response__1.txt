@@ -1,0 +1,1 @@
+ERROR: [youtube] abcdefghijk: Unable to extract initial player response; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U

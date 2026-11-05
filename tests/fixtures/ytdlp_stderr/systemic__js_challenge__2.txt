@@ -1,0 +1,3 @@
+WARNING: [youtube] [jsc] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. YouTube extraction without a JS runtime has been deprecated, and some formats may be missing.
+WARNING: [youtube] abcdefghijk: n challenge solving failed: Some formats may be missing. Ensure you have a supported JavaScript runtime and challenge solver script distribution installed.
+ERROR: [youtube] abcdefghijk: Requested format is not available. Use --list-formats for a list of available formats

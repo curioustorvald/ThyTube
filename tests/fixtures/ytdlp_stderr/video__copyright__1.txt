@@ -1,0 +1,1 @@
+ERROR: [youtube] abcdefghijk: Video unavailable. This video is no longer available due to a copyright claim by Some Label Ltd
