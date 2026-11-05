@@ -33,40 +33,6 @@ rsync -az --delete -e "ssh -p $DEPLOY_PORT" \
   "$DEPLOY_SSH:$DEPLOY_ORIGIN/app/"
 
 echo "==> remote install"
-"${SSH[@]}" DEPLOY_ORIGIN="$DEPLOY_ORIGIN" DEPLOY_PYTHON="$DEPLOY_PYTHON" RESTART="$RESTART" WEB_ONLY="$WEB_ONLY" bash -s <<'REMOTE'
-set -euo pipefail
-O="$DEPLOY_ORIGIN"
-export THYTUBE_CONFIG="$O/config.toml"
-export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-if [ ! -x "$O/venv/bin/python" ]; then
-  echo "    creating $O/venv"
-  "$DEPLOY_PYTHON" -m venv "$O/venv"
-  "$O/venv/bin/pip" install -q --upgrade pip
-fi
-# Editable install: the package finds app/web next to app/src.
-"$O/venv/bin/pip" install -q -e "$O/app"
-if [ ! -f "$THYTUBE_CONFIG" ]; then
-  cp "$O/app/config.example.toml" "$THYTUBE_CONFIG"
-  echo "!!  created $THYTUBE_CONFIG from the example — edit paths/port, then run deploy again"
-  exit 1
-fi
-if [ ! -e "$O/ytdlp/current" ]; then
-  echo "    first yt-dlp install"
-  "$O/venv/bin/thytube" update-ytdlp || true
-fi
-"$O/venv/bin/thytube" migrate
-"$O/venv/bin/thytube" doctor || echo "!!  doctor reported problems (see above)"
-
-if [ "$RESTART" = 1 ]; then
-  roles="serve"; [ "$WEB_ONLY" = 1 ] || roles="serve worker"
-  for r in $roles; do
-    # SIGTERM: systemd (Restart=always) or the cron watchdog brings it back with the new code.
-    pkill -TERM -u "$(id -u)" -f "$O/venv/bin/thytube $r" && echo "    restarted $r" || echo "    $r was not running"
-  done
-  if ! systemctl is-enabled --quiet thytube-web 2>/dev/null; then
-    sleep 3
-    "$O/app/deploy/watchdog.sh" && echo "    started via watchdog"
-  fi
-fi
-REMOTE
+"${SSH[@]}" DEPLOY_ORIGIN="$DEPLOY_ORIGIN" DEPLOY_PYTHON="$DEPLOY_PYTHON" RESTART="$RESTART" WEB_ONLY="$WEB_ONLY" \
+  bash "$DEPLOY_ORIGIN/app/deploy/remote-install.sh"
 echo "==> done"
