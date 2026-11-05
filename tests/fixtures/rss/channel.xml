@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCaaaaaaaaaaaaaaaaaaaaaa"/>
+ <id>yt:channel:aaaaaaaaaaaaaaaaaaaaaa</id>
+ <yt:channelId>aaaaaaaaaaaaaaaaaaaaaa</yt:channelId>
+ <title>Bread &amp; Butter</title>
+ <link rel="alternate" href="https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa"/>
+ <author>
+  <name>Bread &amp; Butter</name>
+  <uri>https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa</uri>
+ </author>
+ <published>2015-03-01T10:00:00+00:00</published>
+ <entry>
+  <id>yt:video:NEWvid00001</id>
+  <yt:videoId>NEWvid00001</yt:videoId>
+  <yt:channelId>UCaaaaaaaaaaaaaaaaaaaaaa</yt:channelId>
+  <title>Sourdough basics, part 3</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=NEWvid00001"/>
+  <author>
+   <name>Bread &amp; Butter</name>
+   <uri>https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa</uri>
+  </author>
+  <published>2026-11-04T16:00:06+00:00</published>
+  <updated>2026-11-05T01:12:44+00:00</updated>
+  <media:group>
+   <media:title>Sourdough basics, part 3</media:title>
+   <media:content url="https://www.youtube.com/v/NEWvid00001?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+   <media:thumbnail url="https://i2.ytimg.com/vi/NEWvid00001/hqdefault.jpg" width="480" height="360"/>
+   <media:description>Part three.</media:description>
+   <media:community>
+    <media:starRating count="120" average="5.00" min="1" max="5"/>
+    <media:statistics views="2001"/>
+   </media:community>
+  </media:group>
+ </entry>
+ <entry>
+  <id>yt:video:NEWvid00002</id>
+  <yt:videoId>NEWvid00002</yt:videoId>
+  <yt:channelId>UCaaaaaaaaaaaaaaaaaaaaaa</yt:channelId>
+  <title>LIVE: Q&amp;A night</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=NEWvid00002"/>
+  <published>2026-11-03T20:00:00+00:00</published>
+  <updated>2026-11-03T22:00:00+00:00</updated>
+  <media:group>
+   <media:title>LIVE: Q&amp;A night</media:title>
+   <media:thumbnail url="https://i2.ytimg.com/vi/NEWvid00002/hqdefault.jpg" width="480" height="360"/>
+  </media:group>
+ </entry>
+ <entry>
+  <id>yt:video:NEWshort001</id>
+  <yt:videoId>NEWshort001</yt:videoId>
+  <yt:channelId>UCaaaaaaaaaaaaaaaaaaaaaa</yt:channelId>
+  <title>Crumb shot #shorts</title>
+  <link rel="alternate" href="https://www.youtube.com/shorts/NEWshort001"/>
+  <published>2026-11-02T12:00:00+00:00</published>
+  <updated>2026-11-02T12:00:00+00:00</updated>
+  <media:group>
+   <media:title>Crumb shot #shorts</media:title>
+   <media:thumbnail url="https://i2.ytimg.com/vi/NEWshort001/hqdefault.jpg" width="480" height="360"/>
+  </media:group>
+ </entry>
+</feed>

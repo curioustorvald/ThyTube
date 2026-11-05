@@ -14,7 +14,7 @@ pattern below. Order matters: the first match wins.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .runner import RunResult
 
@@ -30,6 +30,7 @@ class Classification:
     cls: str
     reason: str
     message: str = ""
+    stderr: str = ""  # the last ~4 KB of stderr, for logs
 
     @property
     def retryable(self) -> bool:
@@ -163,4 +164,5 @@ def _first_match(text: str) -> tuple[str, str] | None:
 def classify(result: RunResult) -> Classification:
     if result.cancelled:
         return Classification(TRANSIENT, "cancelled", "cancelled")
-    return classify_text(result.returncode, result.stderr_tail, timed_out=result.timed_out)
+    k = classify_text(result.returncode, result.stderr_tail, timed_out=result.timed_out)
+    return replace(k, stderr=result.stderr_tail)
