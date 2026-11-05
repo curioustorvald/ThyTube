@@ -30,3 +30,6 @@ build/
 
 # Local dev state
 /.dev/
+
+# Deployment target (private)
+deploy/deploy.env

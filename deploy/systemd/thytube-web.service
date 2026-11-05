@@ -1,0 +1,22 @@
+# Install as root: replace @ORIGIN@, copy to /etc/systemd/system/, then
+#   systemctl daemon-reload && systemctl enable --now thytube-web thytube-worker
+[Unit]
+Description=ThyTube web/API (uvicorn on 127.0.0.1)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wwwrun
+Environment=THYTUBE_CONFIG=@ORIGIN@/config.toml
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=@ORIGIN@
+ExecStart=@ORIGIN@/venv/bin/thytube serve
+# "always" (not on-failure) so deploy.sh can restart it without root by sending SIGTERM.
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

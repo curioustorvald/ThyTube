@@ -1,0 +1,25 @@
+# Install as root alongside thytube-web.service (see there).
+[Unit]
+Description=ThyTube worker (discovery, downloads, pool, health)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wwwrun
+Environment=THYTUBE_CONFIG=@ORIGIN@/config.toml
+# yt-dlp needs node (JS challenges) and ffmpeg/ffprobe on PATH.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=@ORIGIN@
+ExecStart=@ORIGIN@/venv/bin/thytube worker
+# SIGTERM: abandon the current download, clean .partial, release reservations, exit 0.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=5
+Nice=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
