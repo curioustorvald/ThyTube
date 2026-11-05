@@ -82,10 +82,32 @@ def channel_info(sc: dict, channel_id: str) -> dict:
     return ch
 
 
+def _registry_path() -> Path:
+    base = Path(os.environ.get("FAKE_YTDLP_SAMPLE_DIR", Path.home() / ".cache" / "thytube-fake"))
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "channel-registry.json"
+
+
+def registry() -> dict:
+    """video id → channel id, so a video's metadata names the channel that listed it."""
+    try:
+        return json.loads(_registry_path().read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def remember(ids: list[str], channel_id: str) -> None:
+    reg = registry()
+    reg.update({i: channel_id for i in ids})
+    tmp = _registry_path().with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(reg))
+    tmp.replace(_registry_path())
+
+
 def video_info(sc: dict, vid: str) -> dict:
     v = dict(sc.get("videos", {}).get(vid, {}))
     default_duration = int(os.environ.get("FAKE_YTDLP_DURATION", "6"))
-    channel_id = v.get("channel_id") or fake_channel_id(vid[:3])
+    channel_id = v.get("channel_id") or registry().get(vid) or fake_channel_id(vid[:3])
     ch = channel_info(sc, channel_id)
     duration = int(v.get("duration", default_duration))
     title = v.get("title") or f"{ch['title']}: episode {vid[:4]}"
@@ -377,6 +399,7 @@ def main() -> None:
         ids = ch.get("video_ids") or [fake_id(f"{cid}-{tab}-{i}") for i in range(ch["count"])]
         if tab in ("shorts", "streams") and not ch.get(tab):
             ids = []
+        remember(ids[:limit], cid)
         entries = [flat_entry(sc, v) for v in ids[:limit]]
         for e in entries:
             e["channel_id"] = cid

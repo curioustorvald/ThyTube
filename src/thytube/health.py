@@ -233,7 +233,7 @@ def explain(h: dict[str, Any]) -> str:
     """Plain-language explanation for the Status page."""
     state = h.get("effective_state", h["state"])
     if state == OK:
-        return "Everything is working. Downloads and channel checks run normally."
+        return "Downloads and channel checks run normally."
     if state == UPDATING:
         return "Updating yt-dlp. Downloads resume once the update has been checked."
     if state == DEGRADED:
