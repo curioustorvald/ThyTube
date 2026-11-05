@@ -3,7 +3,7 @@ import { get } from './api.js';
 import { Avatar, ProfileScreen } from './components/Profiles.js';
 import { StatusPill } from './components/StatusPill.js';
 import { Icon } from './icons.js';
-import { go, href, useRoute } from './router.js';
+import { back, href, useRoute } from './router.js';
 import { initPwa, isStandalone } from './pwa.js';
 import { store, useStore } from './store.js';
 import { Channel } from './views/Channel.js';
@@ -62,7 +62,7 @@ function App() {
   return html`<div class="shell">
     <header class="topbar">
       ${isStandalone() && ['watch', 'channel'].includes(route.parts[0]) && html`<button class="ghost icon" aria-label="Back"
-        onClick=${() => (history.length > 1 ? history.back() : go('/'))}><${Icon} name="back" /></button>`}
+        onClick=${back}><${Icon} name="back" /></button>`}
       <a class="brand" href="#/"><img src="icon.svg" alt="" />ThyTube</a>
       <span class="spacer"></span>
       <${StatusPill} />
