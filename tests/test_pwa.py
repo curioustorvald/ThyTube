@@ -16,7 +16,7 @@ def shell_list() -> set[str]:
 def test_service_worker_precaches_every_shell_file() -> None:
     on_disk = {
         p.relative_to(WEB).as_posix()
-        for pattern in ("js/**/*.js", "css/*.css", "vendor/*.js", "icons/*.png")
+        for pattern in ("js/**/*.js", "css/*.css", "vendor/*.js", "img/*.png")
         for p in WEB.glob(pattern)
     } | {"index.html", "manifest.webmanifest", "icon.svg"}
     listed = shell_list() - {"./"}
