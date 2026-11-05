@@ -56,6 +56,13 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
   const editing = !!subscription;
   const { rules, errors } = toRules(f);
   const allErrors = { ...errors, ...serverErr };
+  // Changing the backfill of an existing subscription re-runs it in the worker.
+  const oldBackfill = subscription?.backfill_count ?? 0;
+  const backfillChanged = editing && subscription.backfill_done && !errors.backfill_count && rules.backfill_count !== oldBackfill;
+  const backfillChange = !backfillChanged ? null
+    : rules.backfill_count > oldBackfill
+      ? `On saving, up to ${rules.backfill_count - oldBackfill} more of the channel's older videos will be queued.`
+      : 'On saving, older videos beyond this number come off the queue; those already cached stay until evicted.';
 
   const runPreview = useMemo(() => debounce(async (rules) => {
     abort.current?.abort();
@@ -93,7 +100,8 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
       const saved = editing
         ? await patch('/subscriptions/' + subscription.id, rules)
         : await post('/subscriptions', { channel, ...rules });
-      toast(editing ? 'Subscription updated' : `Subscribed to ${channel.title || 'channel'} — backfill queued`);
+      toast(!editing ? `Subscribed to ${channel.title || 'channel'} — backfill queued`
+        : backfillChanged ? 'Subscription updated — re-running the backfill' : 'Subscription updated');
       onSaved?.(saved);
       onClose();
     } catch (e) {
@@ -128,9 +136,9 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
         <label class="field"><span>Longest</span>
           <input type="text" placeholder="no maximum" value=${f.max} onInput=${set('max')} class=${allErrors.max_duration_s ? 'invalid' : ''} />
           ${fieldErr('max_duration_s')}</label>
-        <label class="field"><span>${editing ? 'Backfill (only used when created)' : 'Also fetch this many existing videos'}</span>
-          <input type="number" min="0" max="500" value=${f.backfill_count} onInput=${set('backfill_count')} disabled=${editing} />
-          ${fieldErr('backfill_count')}</label>
+        <label class="field"><span>${editing ? 'Older videos to fetch' : 'Also fetch this many existing videos'}</span>
+          <input type="number" min="0" max="500" value=${f.backfill_count} onInput=${set('backfill_count')} class=${allErrors.backfill_count ? 'invalid' : ''} />
+          ${fieldErr('backfill_count') || (backfillChange && html`<div class="tiny faint">${backfillChange}</div>`)}</label>
         <label class="field"><span>Quality cap</span>
           <select value=${f.max_height} onChange=${set('max_height')}>
             ${HEIGHTS.map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>

@@ -25,6 +25,9 @@ NS = {
     "media": "http://search.yahoo.com/mrss/",
 }
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) ThyTube/0.1"
+BEYOND_BACKFILL = "before subscription (beyond backfill)"
+# States of a video this subscription once picked during backfill; it keeps its slot when re-run.
+PICKED_BEFORE = ("deferred_space", "evicted", "failed", "unavailable")
 
 
 class DiscoveryError(Exception):
@@ -223,6 +226,8 @@ class Discovery:
         entries: list[dict[str, Any]] = []
         for tab in tabs:
             got, meta = list_channel(self.runner, self.cfg, channel_id, tab, limit)
+            for e in got:
+                e["tab"] = tab
             if meta.get("id") == channel_id or (meta and not meta.get("id")):
                 meta["id"] = channel_id
                 upsert_channel_meta(conn, meta)
@@ -233,46 +238,84 @@ class Discovery:
     def _backfill(
         self, conn: sqlite3.Connection, sub: sqlite3.Row, all_subs: list[sqlite3.Row]
     ) -> dict[str, Any]:
+        """Queue the newest `backfill_count` matching videos that predate the subscription.
+
+        Re-run whenever the count is changed: videos this subscription already picked keep their
+        slot, a higher count queues older ones, and a lower one takes not-yet-downloaded picks beyond
+        the new count off the queue (cached ones stay until evicted). Uploads discovered after the
+        first backfill (`backfill_at`) belong to routine polling and are neither counted nor touched.
+        """
         n = sub["backfill_count"]
-        limit = min(max(n * 3, self.cfg.discovery.flat_listing_limit), 300)
+        since = sub["backfill_at"]
+        newer = 0
+        if since:
+            newer = conn.execute(
+                "SELECT COUNT(*) FROM videos WHERE channel_id=? AND discovered_at > ?",
+                (sub["channel_id"], since),
+            ).fetchone()[0]
+        limit = min(min(max(n * 3, self.cfg.discovery.flat_listing_limit), 300) + newer, 1000)
         entries = self._listing(conn, sub["channel_id"], self._tabs([sub]), limit)
         picked = 0
-        queued = filtered = 0
+        queued = filtered = dropped = 0
+        tab: str | None = None
+        in_prefix = False
         with db.tx(conn):
             for e in entries:
                 existing = conn.execute(
-                    "SELECT state, filter_reason FROM videos WHERE id=?", (e["id"],)
+                    "SELECT state, filter_reason, origin, subscription_id, discovered_at FROM videos WHERE id=?",
+                    (e["id"],),
                 ).fetchone()
+                # Listings are newest first, so uploads that arrived after the first backfill form a
+                # prefix of each tab. (Older rows a re-run inserted are newer in the DB but come later.)
+                if e.get("tab") != tab:
+                    tab, in_prefix = e.get("tab"), bool(since)
+                if in_prefix and existing is not None and (existing["discovered_at"] or "") > since:
+                    continue
+                in_prefix = False
                 verdict = filters.listing_verdict(sub, e)
                 wants = verdict.ok and picked < n
                 if existing is not None:
-                    reevaluable = existing["state"] == "filtered" and (
-                        existing["filter_reason"] or ""
-                    ).startswith(("title", "before subscription", "duration", "shorts", "streams"))
+                    state = existing["state"]
+                    ours = existing["subscription_id"] == sub["id"] and existing["origin"] == "subscription"
+                    reevaluable = state == "filtered" and (existing["filter_reason"] or "").startswith(
+                        ("title", "before subscription", "duration", "shorts", "streams")
+                    )
                     if wants and reevaluable:
                         self._queue_existing(conn, e, sub)
                         picked += 1
                         queued += 1
-                    elif wants and existing["state"] in ("queued", "downloading", "cached"):
+                    elif wants and (
+                        state in ("queued", "downloading", "cached") or (ours and state in PICKED_BEFORE)
+                    ):
                         picked += 1
+                    elif verdict.ok and ours and state in ("queued", "deferred_space"):
+                        conn.execute(
+                            "UPDATE videos SET state='filtered', filter_reason=?, queued_at=NULL WHERE id=?",
+                            (BEYOND_BACKFILL, e["id"]),
+                        )
+                        dropped += 1
                     continue
                 if wants:
                     self._insert(conn, e, sub, "queued", None)
                     picked += 1
                     queued += 1
                 else:
-                    reason = verdict.reason if not verdict.ok else "before subscription (beyond backfill)"
+                    reason = verdict.reason if not verdict.ok else BEYOND_BACKFILL
                     self._insert(conn, e, sub, "filtered", reason)
                     filtered += 1
-            conn.execute("UPDATE subscriptions SET backfill_done=1 WHERE id=?", (sub["id"],))
+            conn.execute(
+                "UPDATE subscriptions SET backfill_done=1, backfill_at=COALESCE(backfill_at, ?) WHERE id=?",
+                (db.now_iso(), sub["id"]),
+            )
             db.add_event(
                 conn,
                 "info",
                 "discovery",
-                f"Backfill for {self._channel_title(conn, sub['channel_id'])}: {queued} queued, {filtered} skipped",
-                {"subscription_id": sub["id"], "queued": queued},
+                f"Backfill for {self._channel_title(conn, sub['channel_id'])}: {queued} queued, {filtered} skipped"
+                + (f", {dropped} taken off the queue" if dropped else ""),
+                {"subscription_id": sub["id"], "queued": queued, "dropped": dropped},
             )
-        return {"ok": True, "mode": "backfill", "queued": queued, "filtered": filtered}
+        return {"ok": True, "mode": "backfill", "queued": queued, "filtered": filtered, "dropped": dropped}
 
     def _routine(
         self, conn: sqlite3.Connection, sub: sqlite3.Row, all_subs: list[sqlite3.Row]

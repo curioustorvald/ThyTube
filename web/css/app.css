@@ -411,6 +411,7 @@ label.check input { width: 20px; height: 20px; accent-color: var(--accent); }
   width: 100%; max-width: 760px; max-height: 92dvh;
   display: flex; flex-direction: column;
   background: var(--bg); border-radius: 14px 14px 0 0; box-shadow: var(--shadow);
+  border: 1px solid var(--line);
 }
 @media (min-width: 700px) { .dialog { border-radius: 14px; } }
 .dialog > header { display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 0.75rem 0.75rem 1rem; border-bottom: 1px solid var(--line); }

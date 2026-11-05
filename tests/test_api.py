@@ -164,6 +164,11 @@ def test_subscription_flow(client, worker, scenario) -> None:
     ch = client.get(f"/api/channels/{CH}").json()
     assert ch["subscribed"] and ch["subscriptions"][0]["max_height"] == 720
 
+    # Raising the backfill later fetches more of the back catalogue.
+    assert client.patch(f"/api/subscriptions/{sid}", json={"backfill_count": 4}).json()["backfill_count"] == 4
+    drain(worker)
+    assert client.get("/api/subscriptions").json()["items"][0]["cached_count"] == 4
+
     assert (
         client.patch(
             f"/api/subscriptions/{sid}", json={"exclude_regex": "x[", "case_sensitive": True}
@@ -173,7 +178,7 @@ def test_subscription_flow(client, worker, scenario) -> None:
     assert client.patch(f"/api/subscriptions/{sid}", json={"enabled": False}).json()["enabled"] is False
 
     r = client.delete(f"/api/subscriptions/{sid}?delete_files=true").json()
-    assert r["deleting"] == 2
+    assert r["deleting"] == 4
     drain(worker)
     assert client.get("/api/videos").json()["items"] == []
     assert client.get("/api/subscriptions").json()["items"] == []

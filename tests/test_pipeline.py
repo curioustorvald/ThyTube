@@ -218,7 +218,7 @@ def test_backfill_then_rss(cfg, conn, scenario, monkeypatch) -> None:
     disc = Discovery(cfg, Runner(cfg), Pool(cfg), Health(cfg))
     sid = subscribe(conn, backfill_count=3)
     res = disc.poll(conn, sid)
-    assert res == {"ok": True, "mode": "backfill", "queued": 3, "filtered": 17}
+    assert res == {"ok": True, "mode": "backfill", "queued": 3, "filtered": 17, "dropped": 0}
     assert conn.execute("SELECT COUNT(*) FROM videos WHERE state='queued'").fetchone()[0] == 3
     assert conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 20
     assert conn.execute("SELECT title FROM channels WHERE id=?", (CH,)).fetchone()[0] == "Bread & Butter"
@@ -238,6 +238,47 @@ def test_backfill_then_rss(cfg, conn, scenario, monkeypatch) -> None:
     conn.execute("UPDATE videos SET state='evicted' WHERE id='NEWvid00001'")
     disc.poll(conn, sid)
     assert state(conn, "NEWvid00001")["state"] == "evicted"
+
+
+def test_backfill_count_changed_later(cfg, conn, scenario) -> None:
+    olds = [f"old{i:08d}" for i in range(20)]
+    scenario({"channels": {CH: {"video_ids": olds}}})
+    disc = Discovery(cfg, Runner(cfg), Pool(cfg), Health(cfg))
+    sid = subscribe(conn, backfill_count=3)
+    disc.poll(conn, sid)
+    assert conn.execute("SELECT backfill_at FROM subscriptions").fetchone()[0]
+    conn.execute("UPDATE videos SET state='cached' WHERE id=?", (olds[1],))
+    conn.execute("UPDATE videos SET state='evicted' WHERE id=?", (olds[2],))
+    # A new upload found by a routine poll after the backfill doesn't use up a backfill slot.
+    scenario({"channels": {CH: {"video_ids": ["NEWupload01", *olds]}}})
+    queue(conn, "NEWupload01", origin="subscription", subscription_id=sid)
+    conn.execute("UPDATE videos SET discovered_at='2999-01-01T00:00:00Z' WHERE id='NEWupload01'")
+
+    def rerun(n):
+        conn.execute("UPDATE subscriptions SET backfill_count=? WHERE id=?", (n, sid))
+        return disc.poll(conn, sid, force_backfill=True)
+
+    def queued():
+        return {r[0] for r in conn.execute("SELECT id FROM videos WHERE state='queued'")}
+
+    # Raising it: earlier picks (queued, cached, evicted) keep their slots; three older ones join.
+    assert rerun(6)["queued"] == 3
+    assert queued() == {"NEWupload01", olds[0], *olds[3:6]}
+    assert state(conn, olds[2])["state"] == "evicted"
+
+    # Lowering it: queued picks beyond the new count come off the queue; cached ones stay.
+    res = rerun(1)
+    assert res["queued"] == 0 and res["dropped"] == 3
+    assert queued() == {"NEWupload01", olds[0]}
+    assert state(conn, olds[1])["state"] == "cached"
+    assert state(conn, olds[4])["filter_reason"].startswith("before subscription")
+
+    # Rows a re-run inserted are "newer" in the DB but still old videos.
+    conn.execute("UPDATE videos SET discovered_at='2999-01-01T00:00:00Z' WHERE id=?", (olds[10],))
+    assert rerun(9)["queued"] == 6
+    assert queued() == {"NEWupload01", olds[0], *olds[3:9]}
+    rerun(11)
+    assert state(conn, olds[10])["state"] == "queued"
 
 
 def test_rss_failure_falls_back_to_listing(cfg, conn, scenario, monkeypatch) -> None:

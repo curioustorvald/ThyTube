@@ -137,19 +137,28 @@ def create_subscription(
 def update_subscription(
     sub_id: int, body: dict[str, Any] = Body(...), conn: sqlite3.Connection = Depends(get_conn)
 ) -> dict[str, Any]:
-    _get_sub(conn, sub_id)
+    before = _get_sub(conn, sub_id)
     rules = _clean_rules(body, partial=True)
     if rules:
         sets = ", ".join(f"{k}=?" for k in rules)
-        conn.execute(
-            f"UPDATE subscriptions SET {sets} WHERE id=?",
-            (*[int(v) if isinstance(v, bool) else v for v in rules.values()], sub_id),
-        )
-        if "max_height" in rules:
+        with db.tx(conn):
             conn.execute(
-                "UPDATE videos SET max_height=? WHERE subscription_id=? AND state='queued'",
-                (rules["max_height"], sub_id),
+                f"UPDATE subscriptions SET {sets} WHERE id=?",
+                (*[int(v) if isinstance(v, bool) else v for v in rules.values()], sub_id),
             )
+            if "max_height" in rules:
+                conn.execute(
+                    "UPDATE videos SET max_height=? WHERE subscription_id=? AND state='queued'",
+                    (rules["max_height"], sub_id),
+                )
+            # A changed backfill count re-runs the backfill (more older videos, or fewer queued ones).
+            # Before the first backfill has run, that run simply picks up the new number.
+            if (
+                rules.get("backfill_count", before["backfill_count"]) != before["backfill_count"]
+                and before["backfill_done"]
+                and rules.get("enabled", bool(before["enabled"]))
+            ):
+                db.enqueue_command(conn, "poll_subscription", {"id": sub_id, "backfill": True})
     return subscription_json(_get_sub(conn, sub_id))
 
 
