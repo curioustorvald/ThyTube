@@ -26,6 +26,7 @@ const SHELL = [
   'js/router.js',
   'js/store.js',
   'js/subs.js',
+  'js/theme.js',
   'js/util.js',
   'js/components/Dialog.js',
   'js/components/FilterDialog.js',

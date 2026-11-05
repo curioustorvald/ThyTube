@@ -33,13 +33,20 @@ const P = {
   external: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z',
   edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  sun: 'M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  contrast: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z',
   user: 'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21c1-4 4-6 8-6s7 2 8 6',
 };
+
+// Optional filled overlay drawn on top of the stroked path.
+const HALF = { contrast: 'M12 3a9 9 0 0 1 0 18z' };
 
 export function Icon({ name, size }) {
   const d = P[name] || P.close;
   const fill = name === 'play' || name === 'pause' || name === 'next' || name === 'stop';
   return html`<svg viewBox="0 0 24 24" width=${size || 22} height=${size || 22} aria-hidden="true"
     fill=${fill ? 'currentColor' : 'none'} stroke="currentColor" stroke-width=${fill ? 0 : 2}
-    stroke-linecap="round" stroke-linejoin="round"><path d=${d} /></svg>`;
+    stroke-linecap="round" stroke-linejoin="round"><path d=${d} />
+    ${HALF[name] && html`<path d=${HALF[name]} fill="currentColor" stroke="none" />`}</svg>`;
 }

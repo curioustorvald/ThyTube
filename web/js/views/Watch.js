@@ -118,6 +118,9 @@ export function Watch({ id }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const skipped = useRef([]);
   const playerApi = useRef(null);
+  // Opening a cached video starts it; one that finishes downloading while this page is open doesn't.
+  const autoplay = useRef(true);
+  const firstLoad = useRef(true);
   useStore((s) => s.queueVersion);
   const queue = getQueue();
   const profile = useStore((s) => s.profile);
@@ -125,6 +128,7 @@ export function Watch({ id }) {
   const load = useCallback(async () => {
     try {
       const v = await get('/videos/' + id);
+      if (firstLoad.current) { firstLoad.current = false; autoplay.current = v.state === 'cached'; }
       setVideo(v); setError(null);
       return v;
     } catch (e) {
@@ -136,7 +140,7 @@ export function Watch({ id }) {
     }
   }, [id, profile?.id]);
 
-  useEffect(() => { load(); addPlayed(id); skipped.current = []; window.scrollTo({ top: 0 }); }, [id, profile?.id]);
+  useEffect(() => { firstLoad.current = true; load(); addPlayed(id); skipped.current = []; window.scrollTo({ top: 0 }); }, [id, profile?.id]);
 
   // Poll while queued/downloading.
   useEffect(() => {
@@ -187,7 +191,7 @@ export function Watch({ id }) {
   return html`<div class="watch">
     <div class="watch-main">
       ${cached
-        ? html`<${Player} video=${video} api=${playerApi} onEnded=${onEnded} onTime=${setT}
+        ? html`<${Player} video=${video} api=${playerApi} autoplay=${autoplay.current} onEnded=${onEnded} onTime=${setT}
             onNext=${(mode === 'channel' && pick) || (mode === 'queue' && queue.length) ? playNext : null} />`
         : html`<${NotCached} id=${id} video=${video.missing && !video.title ? null : video} reload=${load} />`}
       <h1 class="watch-title">${video.title || id}</h1>

@@ -1,5 +1,5 @@
-// The video player: one <video> element that is reused across videos (so autoplay keeps working
-// on iOS after the first gesture), our own controls, our own subtitle overlay (plus native tracks
+// The video player: one <video> element for the whole session, reused across videos and across
+// visits to the watch page (so autoplay keeps working on iOS once a tap has unlocked it), our own controls, our own subtitle overlay (plus native tracks
 // for iPhone fullscreen), resume, chapters on the seek bar, touch gestures, keyboard shortcuts,
 // Media Session metadata and watch heartbeats.
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
@@ -17,9 +17,34 @@ const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 
 function trackKey(s) { return s ? `${s.lang}.${s.kind}` : 'off'; }
 
+// iOS (and Safari generally) only lets an element start playback with sound after a user gesture
+// has touched *that element*; the unlock then sticks for the element's lifetime. So the player
+// never re-creates its <video>: it borrows this one, and the first tap anywhere in the app unlocks
+// it (load() inside a gesture is enough), which lets "click a video → it starts" work from the
+// library on the very first visit. Desktop/Android browsers only need sticky page activation.
+let shared = null;
+function sharedVideo() {
+  if (!shared) {
+    shared = document.createElement('video');
+    shared.playsInline = true;
+    shared.setAttribute('playsinline', '');
+    shared.preload = 'metadata';
+    const unlock = () => {
+      if (!shared.isConnected && !shared.getAttribute('src')) shared.load();
+      document.removeEventListener('click', unlock, true);
+      document.removeEventListener('touchend', unlock, true);
+    };
+    document.addEventListener('click', unlock, true);
+    document.addEventListener('touchend', unlock, true);
+  }
+  return shared;
+}
+sharedVideo(); // create it (and its unlock hook) at start-up, before the first tap
+
 export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }) {
   const box = useRef(null);
-  const vid = useRef(null);
+  const slot = useRef(null);
+  const vid = useRef(sharedVideo());
   const hb = useRef({ session: null, videoId: null, played: 0, lastT: null, lastSent: 0 });
   const hideTimer = useRef(null);
   const tap = useRef({ t: 0, side: null, timer: null });
@@ -71,6 +96,36 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     return () => { clearInterval(iv); window.removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onVis); flush(true); };
   }, []);
 
+  // ---- borrow the shared <video> ----------------------------------------------------------
+  // Element events go through a ref so the listeners (attached once) always see this render.
+  const on = useRef({});
+  on.current = {
+    play: () => { setPlaying(true); setStarted(true); },
+    pause: () => setPlaying(false),
+    timeupdate: () => onTimeUpdate(),
+    seeking: () => onSeeking(),
+    ended: () => { flush(); onEnded?.(); },
+    error: () => { if (vid.current.getAttribute('src')) setError('This file could not be played.'); },
+    volumechange: () => setMuted(vid.current.muted),
+  };
+  useEffect(() => {
+    const v = vid.current;
+    slot.current.appendChild(v);
+    setMuted(v.muted);
+    const ls = Object.keys(on.current).map((k) => [k, (e) => on.current[k](e)]);
+    for (const [k, f] of ls) v.addEventListener(k, f);
+    return () => {
+      flush(true); // report the position before the element is reset
+      for (const [k, f] of ls) v.removeEventListener(k, f);
+      v.pause();
+      v.removeAttribute('src');
+      v.removeAttribute('poster');
+      for (const el of v.querySelectorAll('track')) el.remove();
+      v.load(); // abort the download
+      v.remove();
+    };
+  }, []);
+
   // ---- switching videos -------------------------------------------------------------
   useEffect(() => {
     const v = vid.current;
@@ -79,6 +134,14 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     // An ended video reports paused; it was playing, so keep going (auto-advance).
     const wasPlaying = !v.paused || v.ended || autoplay;
     setError(null); setT(0); setBuffered(0); setDur(video.duration_s || 0); setMenu(null); setScrub(null);
+    // Native <track>s (for iPhone fullscreen), in the same order as `subs`.
+    for (const el of v.querySelectorAll('track')) el.remove();
+    for (const s of subs) {
+      const el = document.createElement('track');
+      el.kind = 'subtitles'; el.src = s.url; el.srclang = s.lang;
+      el.label = langName(s.lang) + (s.kind === 'auto' ? ' (auto)' : '');
+      v.appendChild(el);
+    }
     v.src = video.media_url;
     v.poster = video.thumb || '';
     v.playbackRate = p.speed;
@@ -94,7 +157,8 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     };
     v.addEventListener('loadedmetadata', onMeta, { once: true });
     v.load();
-    if (wasPlaying) v.play().catch(() => {});
+    // Autoplay can still be refused (e.g. a direct link opened with no tap yet): show the big play button.
+    if (wasPlaying) v.play().catch((e) => { if (e.name === 'NotAllowedError') setStarted(false); });
     setStarted(wasPlaying);
     // Subtitle choice: remember the language across videos.
     const want = prefs().subLang;
@@ -333,13 +397,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     <div ref=${box} class="player ${showControls ? 'controls-on' : ''}" style=${subStyle}
       onPointerUp=${onSurfacePointerUp} onPointerMove=${(e) => e.pointerType === 'mouse' && poke()}
       onDblClick=${(e) => !e.target.closest('.controls') && toggleFs()}>
-      <video ref=${vid} playsinline preload="metadata"
-        onPlay=${() => { setPlaying(true); setStarted(true); }} onPause=${() => setPlaying(false)}
-        onTimeUpdate=${onTimeUpdate} onSeeking=${onSeeking} onEnded=${() => { flush(); onEnded?.(); }}
-        onError=${() => setError('This file could not be played.')} onVolumeChange=${(e) => setMuted(e.target.muted)}>
-        ${subs.map((s) => html`<track kind="subtitles" src=${s.url} srclang=${s.lang}
-          label=${langName(s.lang) + (s.kind === 'auto' ? ' (auto)' : '')} />`)}
-      </video>
+      <div class="video-slot" ref=${slot}></div>
 
       ${lines.length > 0 && html`<div class="subs-overlay" aria-live="off">${lines.map((l) => html`<span>${l}</span>`)}</div>`}
       ${hint && html`<div class="tap-hint ${hint.side}" key=${hint.k}

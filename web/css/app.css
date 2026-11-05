@@ -26,8 +26,9 @@
   color-scheme: light dark;
 }
 
+/* Dark palette: follows the system unless the user picked a theme (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #131516;
     --surface: #1b1f21;
     --surface-2: #252a2d;
@@ -45,6 +46,25 @@
     --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
   }
 }
+:root[data-theme="dark"] {
+  --bg: #131516;
+  --surface: #1b1f21;
+  --surface-2: #252a2d;
+  --line: #30373b;
+  --ink: #e6e8e9;
+  --muted: #a0aab0;
+  --faint: #737d83;
+  --accent: #55b7a8;
+  --accent-ink: #0d1514;
+  --accent-soft: #1d3633;
+  --ok: #5bbf86;
+  --warn: #e0a84a;
+  --bad: #ef6b5b;
+  --info: #78a8e0;
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 20px rgb(0 0 0 / 30%);
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -223,6 +243,8 @@ label.check input { width: 20px; height: 20px; accent-color: var(--accent); }
   background: var(--surface); border: 1px solid var(--line);
 }
 .pill:hover { text-decoration: none; border-color: var(--faint); }
+.topbar .pill { min-width: 0; white-space: nowrap; }  /* one line; ellipsis on very narrow phones */
+.topbar .pill > span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
 .dot.ok { background: var(--ok); }
 .dot.degraded { background: var(--warn); }

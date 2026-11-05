@@ -1,11 +1,11 @@
-import { html, render, useEffect } from '../vendor/preact-htm.js';
+import { html, render, useEffect, useState } from '../vendor/preact-htm.js';
 import { get } from './api.js';
 import { Avatar, ProfileScreen } from './components/Profiles.js';
 import { StatusPill } from './components/StatusPill.js';
 import { Icon } from './icons.js';
 import { back, href, useRoute } from './router.js';
 import { initPwa, isStandalone } from './pwa.js';
-import { store, useStore } from './store.js';
+import { store, toast, useStore } from './store.js';
 import { Channel } from './views/Channel.js';
 import { Library } from './views/Library.js';
 import { Manage } from './views/Manage.js';
@@ -40,6 +40,21 @@ function Toasts() {
   return html`<div class="toasts" aria-live="polite">${toasts.map((t) => html`<div class="toast ${t.kind}" key=${t.id}>${t.message}</div>`)}</div>`;
 }
 
+// Light/dark override (js/theme.js applies it before first paint). Cycles system → light → dark.
+const THEMES = {
+  auto: ['contrast', 'Theme: follows thy system', 'Theme now follows thy system'],
+  light: ['sun', 'Theme: light', 'Light theme'],
+  dark: ['moon', 'Theme: dark', 'Dark theme'],
+};
+function ThemeToggle() {
+  const [mode, setMode] = useState(() => window.ThyTheme?.get() || 'auto');
+  useEffect(() => window.ThyTheme?.subscribe(setMode), []);
+  if (!window.ThyTheme) return null;
+  const [icon, label] = THEMES[mode];
+  return html`<button class="ghost icon" aria-label=${label + ' (change)'} title=${label}
+    onClick=${() => toast(THEMES[window.ThyTheme.cycle()][2])}><${Icon} name=${icon} /></button>`;
+}
+
 function View({ route }) {
   const [a, b] = route.parts;
   switch (a) {
@@ -66,6 +81,7 @@ function App() {
       <a class="brand" href="#/"><img src="icon.svg" alt="" />ThyTube</a>
       <span class="spacer"></span>
       <${StatusPill} />
+      <${ThemeToggle} />
       <button class="ghost icon" aria-label=${'Profile: ' + profile.name} title=${profile.name}
         onClick=${() => store.set({ pickingProfile: true })}><${Avatar} p=${profile} /></button>
     </header>
