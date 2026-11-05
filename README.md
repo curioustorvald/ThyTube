@@ -174,8 +174,7 @@ The Status page explains the present state in plain words. What thou canst do, r
 4. **Bring a token.** Install a PO-token provider plugin into the yt-dlp venvs with
    `ytdlp.extra_pip_packages`.
 5. **Last resort, off by default.** Point `ytdlp.cookies` at a `cookies.txt` exported from a
-   *throwaway* Google account. Google may flag or ban the account those cookies belong to. Never,
-   ever use thine own.
+   *throwaway* Google account. Google may flag or ban the account those cookies belong to. **Never, ever use thine own.**
 
 ## Notes
 
