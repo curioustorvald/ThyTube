@@ -70,6 +70,25 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
   const chapters = video.chapters || [];
   const subs = video.subtitles || [];
 
+  // ---- native <track>s ----------------------------------------------------------------
+  // Our overlay draws the subtitles; the native tracks exist only for iPhone's native fullscreen.
+  // Browsers may switch a track to 'showing' on their own, after we added it (automatic caption
+  // selection from the OS/browser accessibility settings, Safari's "Automatic" captions…), so
+  // every addtrack/change event re-applies what we want: all disabled, except the chosen track
+  // while the native fullscreen player is up. The user's own pick in that player is left alone.
+  const native = useRef({ subs, track: null, fs: false });
+  native.current.subs = subs;
+  native.current.track = track;
+  function syncNativeTracks(force = false) {
+    const n = native.current;
+    if (n.fs && !force) return;
+    // <track> elements are rendered in the same order as `subs`.
+    Array.from(vid.current.textTracks).forEach((tt, i) => {
+      const mode = n.fs && n.track && trackKey(n.subs[i]) === trackKey(n.track) ? 'showing' : 'disabled';
+      if (tt.mode !== mode) tt.mode = mode;
+    });
+  }
+
   // ---- heartbeats ---------------------------------------------------------------
   function heartbeatPayload() {
     const v = vid.current;
@@ -115,9 +134,21 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     setMuted(v.muted);
     const ls = Object.keys(on.current).map((k) => [k, (e) => on.current[k](e)]);
     for (const [k, f] of ls) v.addEventListener(k, f);
+    const sync = () => syncNativeTracks();
+    const beginFs = () => { native.current.fs = true; syncNativeTracks(true); };
+    const endFs = () => { native.current.fs = false; syncNativeTracks(); };
+    v.textTracks.addEventListener('addtrack', sync);
+    v.textTracks.addEventListener('change', sync);
+    v.addEventListener('webkitbeginfullscreen', beginFs);
+    v.addEventListener('webkitendfullscreen', endFs);
     return () => {
       flush(true); // report the position before the element is reset
       for (const [k, f] of ls) v.removeEventListener(k, f);
+      v.textTracks.removeEventListener('addtrack', sync);
+      v.textTracks.removeEventListener('change', sync);
+      v.removeEventListener('webkitbeginfullscreen', beginFs);
+      v.removeEventListener('webkitendfullscreen', endFs);
+      native.current.fs = false;
       v.pause();
       v.removeAttribute('src');
       v.removeAttribute('poster');
@@ -182,9 +213,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     let alive = true;
     setCues([]); setLines([]);
     if (track) loadCues(track.url).then((c) => alive && setCues(c)).catch(() => alive && setCues([]));
-    // Native tracks: hidden unless iPhone's native fullscreen is showing.
-    const v = vid.current;
-    for (const tt of v.textTracks) tt.mode = 'disabled';
+    syncNativeTracks();
     return () => { alive = false; };
   }, [track && track.url]);
 
@@ -311,21 +340,11 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     const on = () => setFs(!!(document.fullscreenElement || document.webkitFullscreenElement));
     document.addEventListener('fullscreenchange', on);
     document.addEventListener('webkitfullscreenchange', on);
-    const v = vid.current;
-    // <track> elements are rendered in the same order as `subs`.
-    const begin = () => {
-      Array.from(v.textTracks).forEach((tt, i) => { tt.mode = track && trackKey(subs[i]) === trackKey(track) ? 'showing' : 'disabled'; });
-    };
-    const end = () => { for (const tt of v.textTracks) tt.mode = 'disabled'; };
-    v.addEventListener('webkitbeginfullscreen', begin);
-    v.addEventListener('webkitendfullscreen', end);
     return () => {
       document.removeEventListener('fullscreenchange', on);
       document.removeEventListener('webkitfullscreenchange', on);
-      v.removeEventListener('webkitbeginfullscreen', begin);
-      v.removeEventListener('webkitendfullscreen', end);
     };
-  }, [track]);
+  }, []);
 
   // ---- keyboard ---------------------------------------------------------------------------
   useEffect(() => {
