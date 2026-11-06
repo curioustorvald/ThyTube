@@ -1,7 +1,7 @@
 {
   "name": "ThyTube",
   "short_name": "ThyTube",
-  "description": "Thine own YouTube cache, on thine own network.",
+  "description": "Thine own YouTube cache, upon thine own network.",
   "id": "./",
   "start_url": "./#/",
   "scope": "./",
@@ -19,7 +19,7 @@
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
-    { "name": "Search", "url": "./#/search", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Queue", "url": "./#/manage/queue", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Seek", "url": "./#/search", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192" }] },
+    { "name": "The queue", "url": "./#/manage/queue", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192" }] }
   ]
 }

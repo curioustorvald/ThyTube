@@ -1,6 +1,7 @@
 import { html } from '../../vendor/preact-htm.js';
 import { href } from '../router.js';
-import { ago, fmtDuration, STATE_BADGE, STATE_LABEL } from '../util.js';
+import { t } from '../i18n.js';
+import { ago, fmtDuration, STATE_BADGE, stateLabel } from '../util.js';
 
 export function progressFraction(v) {
   const pos = v.me?.position_s || 0;
@@ -10,12 +11,12 @@ export function progressFraction(v) {
 
 export function VideoBadges({ v, showState = false }) {
   const badges = [];
-  if (showState || v.state !== 'cached') badges.push(html`<span class="badge ${STATE_BADGE[v.state] || ''}">${STATE_LABEL[v.state] || v.state}</span>`);
-  if (v.pinned) badges.push(html`<span class="badge info">Pinned</span>`);
-  if (v.codec_warning) badges.push(html`<span class="badge warn" title="${v.vcodec}/${v.acodec}">Not H.264</span>`);
+  if (showState || v.state !== 'cached') badges.push(html`<span class="badge ${STATE_BADGE[v.state] || ''}">${stateLabel(v.state)}</span>`);
+  if (v.pinned) badges.push(html`<span class="badge info">${t('badge.pinned')}</span>`);
+  if (v.codec_warning) badges.push(html`<span class="badge warn" title="${v.vcodec}/${v.acodec}">${t('badge.notH264')}</span>`);
   if (v.me && v.state === 'cached') {
-    if (progressFraction(v) > 0) badges.push(html`<span class="badge accent">In progress</span>`);
-    else if (!v.me.watch_count) badges.push(html`<span class="badge">Unwatched</span>`);
+    if (progressFraction(v) > 0) badges.push(html`<span class="badge accent">${t('badge.inProgress')}</span>`);
+    else if (!v.me.watch_count) badges.push(html`<span class="badge">${t('badge.unwatched')}</span>`);
   }
   return badges.length ? html`<div class="vbadges">${badges}</div>` : null;
 }
@@ -28,7 +29,7 @@ export function VideoCard({ v, sub, showChannel = true, onClick, extra }) {
     <a class="vcard ${v.state === 'evicted' ? 'dim' : ''}" href=${href('/watch/' + v.id)} onClick=${onClick}>
       <div class="thumb">
         <img src=${v.thumb} alt="" loading="lazy" decoding="async" />
-        ${unwatched && html`<span class="new-dot" title="Unwatched"></span>`}
+        ${unwatched && html`<span class="new-dot" title=${t('badge.unwatched')}></span>`}
         ${v.duration_s ? html`<span class="dur">${fmtDuration(v.duration_s)}</span>` : null}
         ${frac > 0 && html`<div class="prog"><span style=${{ width: frac * 100 + '%' }}></span></div>`}
       </div>

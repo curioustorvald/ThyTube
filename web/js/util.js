@@ -1,4 +1,5 @@
 // Formatting helpers.
+import { has, locale, t } from './i18n.js';
 
 export function fmtDuration(s) {
   if (s === null || s === undefined || isNaN(s)) return '';
@@ -16,14 +17,15 @@ export function fmtBytes(b) {
   return (v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + u[i];
 }
 
-const rtf = new Intl.RelativeTimeFormat('en-GB', { numeric: 'auto' });
 export function ago(iso) {
   if (!iso) return '';
   const diff = (new Date(iso).getTime() - Date.now()) / 1000;
   const abs = Math.abs(diff);
   const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
-  for (const [unit, secs] of units) if (abs >= secs) return rtf.format(Math.round(diff / secs), unit);
-  return diff < 0 ? 'just now' : 'in a moment';
+  for (const [unit, secs] of units) {
+    if (abs >= secs) return t(`time.${diff < 0 ? 'past' : 'future'}.${unit}`, { count: Math.round(abs / secs) });
+  }
+  return t(diff < 0 ? 'time.justNow' : 'time.soon');
 }
 
 export function fmtTime(iso) {
@@ -31,13 +33,13 @@ export function fmtTime(iso) {
   const d = new Date(iso);
   const sameDay = d.toDateString() === new Date().toDateString();
   return sameDay
-    ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    ? d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString(locale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 export function fmtDate(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // "1:02:03" / "4:05" → seconds
@@ -63,13 +65,34 @@ export function durationInputValue(s) {
   return fmtDuration(s);
 }
 
-export const STATE_LABEL = {
-  cached: 'Cached', queued: 'Queued', downloading: 'Downloading', evicted: 'Removed', filtered: 'Skipped',
-  unavailable: 'Unavailable', failed: 'Failed', deferred_space: 'Waiting for space', discovered: 'Discovered',
-};
+export const stateLabel = (state) => (has('state.' + state) ? t('state.' + state) : state);
 export const STATE_BADGE = {
   cached: 'ok', queued: 'info', downloading: 'info', evicted: '', filtered: '', unavailable: 'bad', failed: 'bad', deferred_space: 'warn',
 };
+
+// The server records why a video was skipped in plain English (videos.filter_reason, preview items);
+// show the known ones in the user's language and anything else as it came.
+const REASONS = [
+  [/^title: doesn't match include pattern$/, 'reason.noInclude'],
+  [/^title: matches exclude pattern$/, 'reason.exclude'],
+  [/^duration: shorter than (.+)$/, 'reason.tooShort'],
+  [/^duration: longer than (.+)$/, 'reason.tooLong'],
+  [/^shorts excluded$/, 'reason.shorts'],
+  [/^streams excluded$/, 'reason.streams'],
+  [/^before subscription \(beyond backfill\)$/, 'reason.beyondBackfill'],
+  [/^before subscription$/, 'reason.beforeSub'],
+  [/^cancelled$/, 'reason.cancelled'],
+  [/^subscription (removed|deleted)$/, 'reason.subscriptionRemoved'],
+  [/^deleted by user$/, 'reason.deletedByUser'],
+];
+export function reasonText(r) {
+  if (!r) return r;
+  for (const [rx, key] of REASONS) {
+    const m = r.match(rx);
+    if (m) return t(key, { duration: m[1] });
+  }
+  return r;
+}
 
 export function debounce(fn, ms) {
   let t;

@@ -4,6 +4,7 @@
 // Media Session metadata and watch heartbeats.
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { beacon, post } from '../api.js';
+import { t as tr } from '../i18n.js';
 import { Icon } from '../icons.js';
 import { prefs, setPref, store } from '../store.js';
 import { activeCues, langName, loadCues } from '../subs.js';
@@ -11,7 +12,7 @@ import { fmtDuration, uuid } from '../util.js';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const SUB_SIZES = { s: '0.9rem', m: '1.15rem', l: '1.45rem', xl: '1.85rem' };
-const SUB_BGS = [[0, 'None'], [0.45, 'Light'], [0.75, 'Solid']];
+const SUB_BGS = [[0, 'bgNone'], [0.45, 'bgLight'], [0.75, 'bgSolid']]; // [opacity, player.* key]
 const HEARTBEAT_MS = 15000;
 const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 
@@ -105,7 +106,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     timeupdate: () => onTimeUpdate(),
     seeking: () => onSeeking(),
     ended: () => { flush(); onEnded?.(); },
-    error: () => { if (vid.current.getAttribute('src')) setError('This file could not be played.'); },
+    error: () => { if (vid.current.getAttribute('src')) setError(tr('player.cantPlay')); },
     volumechange: () => setMuted(vid.current.muted),
   };
   useEffect(() => {
@@ -139,7 +140,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     for (const s of subs) {
       const el = document.createElement('track');
       el.kind = 'subtitles'; el.src = s.url; el.srclang = s.lang;
-      el.label = langName(s.lang) + (s.kind === 'auto' ? ' (auto)' : '');
+      el.label = s.kind === 'auto' ? tr('player.autoShort', { lang: langName(s.lang) }) : langName(s.lang);
       v.appendChild(el);
     }
     v.src = video.media_url;
@@ -363,7 +364,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
     const i = subs.findIndex((s) => trackKey(s) === trackKey(track));
     const next = i + 1 < subs.length ? subs[i + 1] : null;
     chooseTrack(next);
-    flash('c', next ? 'Subtitles: ' + langName(next.lang) : 'Subtitles off');
+    flash('c', next ? tr('player.subtitlesOn', { lang: langName(next.lang) }) : tr('player.subtitlesOff'));
   }
 
   // ---- seek bar -----------------------------------------------------------------------------
@@ -402,14 +403,14 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
       ${lines.length > 0 && html`<div class="subs-overlay" aria-live="off">${lines.map((l) => html`<span>${l}</span>`)}</div>`}
       ${hint && html`<div class="tap-hint ${hint.side}" key=${hint.k}
         style=${hint.side === 'c' ? { left: '50%', transform: 'translate(-50%,-50%)' } : null}>${hint.text}</div>`}
-      ${!started && !error && html`<button class="big-play" aria-label="Play" onClick=${togglePlay}><${Icon} name="play" /></button>`}
+      ${!started && !error && html`<button class="big-play" aria-label=${tr('player.play')} onClick=${togglePlay}><${Icon} name="play" /></button>`}
       ${error && html`<div class="notcached" style="position:absolute;inset:0;border-radius:0"><div class="over"><p>${error}</p></div></div>`}
-      ${resumeFrom !== null && html`<div class="resume-chip">Resumed at ${fmtDuration(resumeFrom)}
-        <button class="small" onClick=${() => { vid.current.currentTime = 0; setResumeFrom(null); }}>Start over</button></div>`}
+      ${resumeFrom !== null && html`<div class="resume-chip">${tr('player.resumedAt', { time: fmtDuration(resumeFrom) })}
+        <button class="small" onClick=${() => { vid.current.currentTime = 0; setResumeFrom(null); }}>${tr('player.startOver')}</button></div>`}
 
       <div class="controls" onPointerUp=${(e) => e.stopPropagation()}>
         <div class="seek" ref=${seekRef} onPointerDown=${onSeekDown} onPointerMove=${onSeekMove} onPointerUp=${onSeekUp}
-          onPointerLeave=${() => !scrub?.drag && setScrub(null)} role="slider" aria-label="Seek"
+          onPointerLeave=${() => !scrub?.drag && setScrub(null)} role="slider" aria-label=${tr('player.seek')}
           aria-valuemin="0" aria-valuemax=${Math.round(total)} aria-valuenow=${Math.round(t)}>
           <div class="track">
             <div class="buf" style=${{ width: (buffered / total) * 100 + '%' }}></div>
@@ -421,37 +422,37 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
             ${fmtDuration(scrub.frac * total)}${chapterAt(scrub.frac * total) ? ' · ' + chapterAt(scrub.frac * total).title : ''}</div>`}
         </div>
         <div class="crow">
-          <button onClick=${togglePlay} aria-label=${playing ? 'Pause' : 'Play'}><${Icon} name=${playing ? 'pause' : 'play'} /></button>
-          <button onClick=${() => { seekBy(-10); flash('l', '−10 s'); }} aria-label="Back 10 seconds"><${Icon} name="back10" /></button>
-          <button onClick=${() => { seekBy(10); flash('r', '+10 s'); }} aria-label="Forward 10 seconds"><${Icon} name="fwd10" /></button>
-          ${onNext && html`<button onClick=${onNext} aria-label="Next video"><${Icon} name="next" /></button>`}
+          <button onClick=${togglePlay} aria-label=${playing ? tr('player.pause') : tr('player.play')}><${Icon} name=${playing ? 'pause' : 'play'} /></button>
+          <button onClick=${() => { seekBy(-10); flash('l', '−10 s'); }} aria-label=${tr('player.back10')}><${Icon} name="back10" /></button>
+          <button onClick=${() => { seekBy(10); flash('r', '+10 s'); }} aria-label=${tr('player.forward10')}><${Icon} name="fwd10" /></button>
+          ${onNext && html`<button onClick=${onNext} aria-label=${tr('player.next')}><${Icon} name="next" /></button>`}
           <span class="time">${fmtDuration(shownT)} / ${fmtDuration(total)}</span>
           <span class="grow"></span>
-          ${!IS_IPHONE && html`<button onClick=${() => { const v = vid.current; v.muted = !v.muted; }} aria-label=${muted ? 'Unmute' : 'Mute'}>
+          ${!IS_IPHONE && html`<button onClick=${() => { const v = vid.current; v.muted = !v.muted; }} aria-label=${muted ? tr('player.unmute') : tr('player.mute')}>
             <${Icon} name=${muted ? 'mute' : 'volume'} /></button>`}
           ${p.speed !== 1 && html`<button class="txt" onClick=${() => setMenu(menu === 'settings' ? null : 'settings')}>${p.speed}×</button>`}
-          ${subs.length > 0 && html`<button onClick=${() => setMenu(menu === 'subs' ? null : 'subs')} aria-label="Subtitles"
+          ${subs.length > 0 && html`<button onClick=${() => setMenu(menu === 'subs' ? null : 'subs')} aria-label=${tr('player.subtitles')}
             class=${track ? 'active' : ''} aria-pressed=${!!track}><${Icon} name="cc" /></button>`}
-          <button onClick=${() => setMenu(menu === 'settings' ? null : 'settings')} aria-label="Settings"><${Icon} name="gear" /></button>
-          <button onClick=${toggleFs} aria-label="Fullscreen"><${Icon} name=${fs ? 'exitfull' : 'full'} /></button>
+          <button onClick=${() => setMenu(menu === 'settings' ? null : 'settings')} aria-label=${tr('player.settings')}><${Icon} name="gear" /></button>
+          <button onClick=${toggleFs} aria-label=${tr('player.fullscreen')}><${Icon} name=${fs ? 'exitfull' : 'full'} /></button>
         </div>
       </div>
 
       ${menu === 'subs' && html`<div class="menu" onPointerUp=${(e) => e.stopPropagation()}>
-        <h4>Subtitles</h4>
-        <button class=${!track ? 'on' : ''} onClick=${() => chooseTrack(null)}>Off</button>
+        <h4>${tr('player.subtitles')}</h4>
+        <button class=${!track ? 'on' : ''} onClick=${() => chooseTrack(null)}>${tr('player.off')}</button>
         ${subs.map((s) => html`<button class=${trackKey(s) === trackKey(track) ? 'on' : ''} onClick=${() => chooseTrack(s)}>
-          ${langName(s.lang)}${s.kind === 'auto' ? ' (auto-generated)' : ''}</button>`)}
-        <h4>Size</h4>
+          ${s.kind === 'auto' ? tr('player.autoLong', { lang: langName(s.lang) }) : langName(s.lang)}</button>`)}
+        <h4>${tr('player.size')}</h4>
         <div class="row">${Object.keys(SUB_SIZES).map((k) => html`<button class=${p.subSize === k ? 'on' : ''}
           onClick=${() => setP(setPref('subSize', k))}>${k.toUpperCase()}</button>`)}</div>
-        <h4>Background</h4>
+        <h4>${tr('player.background')}</h4>
         <div class="row">${SUB_BGS.map(([v, l]) => html`<button class=${p.subBg === v ? 'on' : ''}
-          onClick=${() => setP(setPref('subBg', v))}>${l}</button>`)}</div>
+          onClick=${() => setP(setPref('subBg', v))}>${tr('player.' + l)}</button>`)}</div>
       </div>`}
       ${menu === 'settings' && html`<div class="menu" onPointerUp=${(e) => e.stopPropagation()}>
-        <h4>Speed</h4>
-        ${SPEEDS.map((s) => html`<button class=${p.speed === s ? 'on' : ''} onClick=${() => { setSpeed(s); setMenu(null); }}>${s === 1 ? 'Normal' : s + '×'}</button>`)}
+        <h4>${tr('player.speed')}</h4>
+        ${SPEEDS.map((s) => html`<button class=${p.speed === s ? 'on' : ''} onClick=${() => { setSpeed(s); setMenu(null); }}>${s === 1 ? tr('player.normal') : s + '×'}</button>`)}
       </div>`}
     </div>`;
 }

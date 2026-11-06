@@ -1,4 +1,5 @@
 import { html, useEffect } from '../../vendor/preact-htm.js';
+import { t } from '../i18n.js';
 import { Icon } from '../icons.js';
 
 export function Dialog({ title, onClose, children, footer, narrow }) {
@@ -13,17 +14,17 @@ export function Dialog({ title, onClose, children, footer, narrow }) {
     <div class="backdrop" onClick=${(e) => e.target === e.currentTarget && onClose()}>
       <div class="dialog ${narrow ? 'narrow' : ''}" role="dialog" aria-modal="true" aria-label=${title}>
         <header><h2 class="grow">${title}</h2>
-          <button class="ghost icon" onClick=${onClose} aria-label="Close"><${Icon} name="close" /></button></header>
+          <button class="ghost icon" onClick=${onClose} aria-label=${t('dialog.close')}><${Icon} name="close" /></button></header>
         <div class="body">${children}</div>
         ${footer && html`<footer>${footer}</footer>`}
       </div>
     </div>`;
 }
 
-export function Confirm({ title, message, confirmLabel = 'OK', danger, onConfirm, onClose, children }) {
+export function Confirm({ title, message, confirmLabel, danger, onConfirm, onClose, children }) {
   return html`<${Dialog} title=${title} onClose=${onClose} narrow
-    footer=${html`<button onClick=${onClose}>Cancel</button>
-      <button class=${danger ? 'danger solid' : 'primary'} onClick=${() => { onConfirm(); onClose(); }}>${confirmLabel}</button>`}>
+    footer=${html`<button onClick=${onClose}>${t('common.cancel')}</button>
+      <button class=${danger ? 'danger solid' : 'primary'} onClick=${() => { onConfirm(); onClose(); }}>${confirmLabel || t('common.ok')}</button>`}>
     <p>${message}</p>${children}
   <//>`;
 }

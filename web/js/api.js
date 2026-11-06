@@ -1,4 +1,5 @@
 // fetch wrapper: JSON in/out, X-Profile header, uniform errors.
+import { t } from './i18n.js';
 import { store } from './store.js';
 
 export class ApiError extends Error {
@@ -29,7 +30,7 @@ export async function api(path, { method = 'GET', body, signal, query } = {}) {
     res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined, signal });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new ApiError(0, 'network', 'Cannot reach the ThyTube server. Art thou on thy home network?');
+    throw new ApiError(0, 'network', t('api.unreachable'));
   }
   let data = null;
   const text = await res.text();
@@ -38,7 +39,7 @@ export async function api(path, { method = 'GET', body, signal, query } = {}) {
   }
   if (!res.ok) {
     const err = (data && data.error) || {};
-    throw new ApiError(res.status, err.code || 'http_' + res.status, err.message || res.statusText || 'Request failed', err);
+    throw new ApiError(res.status, err.code || 'http_' + res.status, err.message || res.statusText || t('api.failed'), err);
   }
   return data;
 }

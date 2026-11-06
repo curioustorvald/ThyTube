@@ -1,11 +1,12 @@
 // "Cache this creator…": subscription rules with a live preview against recent uploads.
 import { html, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import { api, patch, post } from '../api.js';
+import { t } from '../i18n.js';
 import { toast, toastError } from '../store.js';
-import { debounce, durationInputValue, fmtDuration, parseDurationInput } from '../util.js';
+import { debounce, durationInputValue, fmtDuration, parseDurationInput, reasonText } from '../util.js';
 import { Dialog } from './Dialog.js';
 
-const HEIGHTS = [['', 'Default'], ['1080', '1080p'], ['720', '720p'], ['480', '480p'], ['360', '360p']];
+const HEIGHTS = ['1080', '720', '480', '360'];
 
 function initial(sub) {
   return {
@@ -25,10 +26,10 @@ function toRules(f) {
   const errors = {};
   const min = parseDurationInput(f.min);
   const max = parseDurationInput(f.max);
-  if (Number.isNaN(min)) errors.min_duration_s = 'Use e.g. 2:30, 90s or 10m';
-  if (Number.isNaN(max)) errors.max_duration_s = 'Use e.g. 1:00:00 or 45m';
+  if (Number.isNaN(min)) errors.min_duration_s = t('filter.minFormat');
+  if (Number.isNaN(max)) errors.max_duration_s = t('filter.maxFormat');
   const backfill = parseInt(f.backfill_count || '0', 10);
-  if (Number.isNaN(backfill) || backfill < 0 || backfill > 500) errors.backfill_count = '0 to 500';
+  if (Number.isNaN(backfill) || backfill < 0 || backfill > 500) errors.backfill_count = t('filter.backfillRange');
   return {
     errors,
     rules: {
@@ -61,8 +62,8 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
   const backfillChanged = editing && subscription.backfill_done && !errors.backfill_count && rules.backfill_count !== oldBackfill;
   const backfillChange = !backfillChanged ? null
     : rules.backfill_count > oldBackfill
-      ? `On saving, up to ${rules.backfill_count - oldBackfill} more of the channel's older videos will be queued.`
-      : 'On saving, older videos beyond this number come off the queue; those already cached stay until evicted.';
+      ? t('filter.backfillMore', { count: rules.backfill_count - oldBackfill })
+      : t('filter.backfillLess');
 
   const runPreview = useMemo(() => debounce(async (rules) => {
     abort.current?.abort();
@@ -100,8 +101,8 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
       const saved = editing
         ? await patch('/subscriptions/' + subscription.id, rules)
         : await post('/subscriptions', { channel, ...rules });
-      toast(!editing ? `Subscribed to ${channel.title || 'channel'} — backfill queued`
-        : backfillChanged ? 'Subscription updated — re-running the backfill' : 'Subscription updated');
+      toast(!editing ? t('filter.subscribed', { channel: channel.title || t('common.thisChannel') })
+        : backfillChanged ? t('filter.updatedBackfill') : t('filter.updated'));
       onSaved?.(saved);
       onClose();
     } catch (e) {
@@ -114,52 +115,53 @@ export function FilterDialog({ channel, subscription, onClose, onSaved }) {
 
   const fieldErr = (k) => allErrors[k] && html`<div class="field-error">${allErrors[k]}</div>`;
 
-  return html`<${Dialog} title=${editing ? `Rules for ${channel.title || channel.id}` : `Cache ${channel.title || 'this creator'}`}
+  return html`<${Dialog} title=${editing ? t('filter.titleEdit', { channel: channel.title || channel.id }) : t('filter.titleNew', { channel: channel.title || t('common.thisCreator') })}
     onClose=${onClose}
-    footer=${html`<span class="grow small muted">${preview ? `${preview.matched} of ${preview.total} recent uploads would be cached` : ''}</span>
-      <button onClick=${onClose}>Cancel</button>
-      <button class="primary" disabled=${saving || Object.keys(allErrors).length} onClick=${save}>${editing ? 'Save' : 'Subscribe'}</button>`}>
+    footer=${html`<span class="grow small muted">${preview ? t('filter.wouldCache', { matched: preview.matched, total: preview.total }) : ''}</span>
+      <button onClick=${onClose}>${t('common.cancel')}</button>
+      <button class="primary" disabled=${saving || Object.keys(allErrors).length} onClick=${save}>${editing ? t('filter.save') : t('filter.subscribe')}</button>`}>
     <div class="stack">
-      <p class="small muted">A subscription is a filter: new uploads that pass it are downloaded automatically. Patterns are Python regular expressions matched anywhere in the title.</p>
+      <p class="small muted">${t('filter.intro')}</p>
       <div class="grid2">
-        <label class="field"><span>Title must match</span>
-          <input type="text" class="mono ${allErrors.include_regex ? 'invalid' : ''}" placeholder="e.g. sourdough|rye"
+        <label class="field"><span>${t('filter.include')}</span>
+          <input type="text" class="mono ${allErrors.include_regex ? 'invalid' : ''}" placeholder=${t('filter.includeHint')}
             value=${f.include_regex} onInput=${set('include_regex')} autocapitalize="off" spellcheck="false" />
           ${fieldErr('include_regex')}</label>
-        <label class="field"><span>Title must not match</span>
-          <input type="text" class="mono ${allErrors.exclude_regex ? 'invalid' : ''}" placeholder="e.g. #shorts|trailer"
+        <label class="field"><span>${t('filter.exclude')}</span>
+          <input type="text" class="mono ${allErrors.exclude_regex ? 'invalid' : ''}" placeholder=${t('filter.excludeHint')}
             value=${f.exclude_regex} onInput=${set('exclude_regex')} autocapitalize="off" spellcheck="false" />
           ${fieldErr('exclude_regex')}</label>
-        <label class="field"><span>Shortest</span>
-          <input type="text" placeholder="no minimum" value=${f.min} onInput=${set('min')} class=${allErrors.min_duration_s ? 'invalid' : ''} />
+        <label class="field"><span>${t('filter.shortest')}</span>
+          <input type="text" placeholder=${t('filter.noBound')} value=${f.min} onInput=${set('min')} class=${allErrors.min_duration_s ? 'invalid' : ''} />
           ${fieldErr('min_duration_s')}</label>
-        <label class="field"><span>Longest</span>
-          <input type="text" placeholder="no maximum" value=${f.max} onInput=${set('max')} class=${allErrors.max_duration_s ? 'invalid' : ''} />
+        <label class="field"><span>${t('filter.longest')}</span>
+          <input type="text" placeholder=${t('filter.noBound')} value=${f.max} onInput=${set('max')} class=${allErrors.max_duration_s ? 'invalid' : ''} />
           ${fieldErr('max_duration_s')}</label>
-        <label class="field"><span>${editing ? 'Older videos to fetch' : 'Also fetch this many existing videos'}</span>
+        <label class="field"><span>${editing ? t('filter.backfillEdit') : t('filter.backfillNew')}</span>
           <input type="number" min="0" max="500" value=${f.backfill_count} onInput=${set('backfill_count')} class=${allErrors.backfill_count ? 'invalid' : ''} />
           ${fieldErr('backfill_count') || (backfillChange && html`<div class="tiny faint">${backfillChange}</div>`)}</label>
-        <label class="field"><span>Quality cap</span>
+        <label class="field"><span>${t('filter.quality')}</span>
           <select value=${f.max_height} onChange=${set('max_height')}>
-            ${HEIGHTS.map(([v, l]) => html`<option value=${v}>${l}</option>`)}</select></label>
+            <option value="">${t('filter.qualityDefault')}</option>
+            ${HEIGHTS.map((v) => html`<option value=${v}>${v}p</option>`)}</select></label>
       </div>
       <div class="row wrap">
-        <label class="check"><input type="checkbox" checked=${f.case_sensitive} onChange=${set('case_sensitive')} /> Case-sensitive</label>
-        <label class="check"><input type="checkbox" checked=${f.include_shorts} onChange=${set('include_shorts')} /> Include Shorts</label>
-        <label class="check"><input type="checkbox" checked=${f.include_streams} onChange=${set('include_streams')} /> Include past live streams</label>
+        <label class="check"><input type="checkbox" checked=${f.case_sensitive} onChange=${set('case_sensitive')} /> ${t('filter.caseSensitive')}</label>
+        <label class="check"><input type="checkbox" checked=${f.include_shorts} onChange=${set('include_shorts')} /> ${t('filter.shorts')}</label>
+        <label class="check"><input type="checkbox" checked=${f.include_streams} onChange=${set('include_streams')} /> ${t('filter.streams')}</label>
       </div>
       <div>
-        <div class="section-head"><h3>Preview: recent uploads</h3>
-          <span class="small muted">${loading ? 'Checking…' : preview ? `${preview.matched}/${preview.total} match` : ''}</span></div>
-        ${previewErr && html`<div class="error-box small">Couldn't load the channel's uploads: ${previewErr}</div>`}
+        <div class="section-head"><h3>${t('filter.previewHead')}</h3>
+          <span class="small muted">${loading ? t('filter.checking') : preview ? t('filter.matchCount', { matched: preview.matched, total: preview.total }) : ''}</span></div>
+        ${previewErr && html`<div class="error-box small">${t('filter.previewError', { error: previewErr })}</div>`}
         ${preview && html`<ul class="preview-list">
           ${preview.items.map((i) => html`<li class=${i.match ? '' : 'no-match'}>
             <span class="mark ${i.match ? 'yes' : 'no'}">${i.match ? '✓' : '✗'}</span>
-            <span class="grow ttl">${i.title}${i.is_short ? html` <span class="badge">Short</span>` : ''}</span>
-            <span class="tiny faint nowrap">${i.match ? (i.duration ? fmtDuration(i.duration) : '') : i.reason}</span>
+            <span class="grow ttl">${i.title}${i.is_short ? html` <span class="badge">${t('badge.short')}</span>` : ''}</span>
+            <span class="tiny faint nowrap">${i.match ? (i.duration ? fmtDuration(i.duration) : '') : reasonText(i.reason)}</span>
           </li>`)}
         </ul>
-        <p class="tiny faint">${preview.note}</p>`}
+        <p class="tiny faint">${t('filter.previewNote')}</p>`}
       </div>
     </div>
   <//>`;
