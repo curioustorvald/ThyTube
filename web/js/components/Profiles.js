@@ -2,6 +2,7 @@ import { html, useEffect, useState } from '../../vendor/preact-htm.js';
 import { get, post, patch, del } from '../api.js';
 import { setProfile, store, toastError, useStore } from '../store.js';
 import { t } from '../i18n.js';
+import { LangPicker } from './LangPicker.js';
 import { initials } from '../util.js';
 
 export const COLOURS = ['#2a7f74', '#3b6ea8', '#8a5cc2', '#c2569b', '#d0663a', '#b7891f', '#4f8a3a', '#5d6870'];
@@ -67,5 +68,6 @@ export function ProfileScreen() {
       ${items?.length ? html`<button class="ghost small" onClick=${() => setEditing(!editing)}>${editing ? t('profiles.done') : t('profiles.manage')}</button>` : null}
       ${current && html`<button class="ghost small" onClick=${() => store.set({ pickingProfile: false })}>${t('common.back')}</button>`}
     </div>
+    <${LangPicker} showName />
   </div>`;
 }

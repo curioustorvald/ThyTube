@@ -9,12 +9,29 @@
 // The default language ('en') is always loaded and fills any key a translation lacks. To add a
 // language: copy web/lang/en.json to web/lang/<code>.json, translate it, add it to LANGUAGES below
 // and to SHELL in sw.js. The choice is per device: prefs().lang, or the browser's language.
-import { prefs } from './store.js';
+import { prefs, setPref } from './store.js';
 
 export const DEFAULT_LANG = 'en';
-// code → name shown to the user (in that language).
-export const LANGUAGES = { en: 'English (Early Modern)' };
+// code → name shown in the language picker, in that language (one entry per line: tests read this).
+export const LANGUAGES = {
+  en: 'English (Early Modern)',
+  ko: '근ᄃᆡ 됴션말',
+};
 
+// Webfonts a language needs (app.css applies them under :lang()); preloaded so they arrive with the strings.
+const FONTS = {
+  ko: ['vendor/fonts/NotoSansCJKkr-2.004-Hangul-Regular.woff2', 'vendor/fonts/NotoSansCJKkr-2.004-Hangul-Bold.woff2'],
+};
+
+function preloadFonts(lang) {
+  for (const href of FONTS[lang] || []) {
+    const l = document.createElement('link');
+    Object.assign(l, { rel: 'preload', as: 'font', type: 'font/woff2', href, crossOrigin: 'anonymous' });
+    document.head.appendChild(l);
+  }
+}
+
+let code = DEFAULT_LANG;
 let base = null; // the default language
 let cur = null; // the chosen language (=== base when it is the default)
 let plural = null;
@@ -38,14 +55,24 @@ function chooseLang() {
 
 /** Load the strings; main.js awaits this before the first render. */
 export async function initI18n() {
-  const code = chooseLang();
+  code = chooseLang();
+  preloadFonts(code);
   base = await fetchLang(DEFAULT_LANG);
   cur = base;
   if (code !== DEFAULT_LANG) {
-    try { cur = await fetchLang(code); } catch (e) { console.warn('language not loaded, using the default', e); }
+    try { cur = await fetchLang(code); } catch (e) { code = DEFAULT_LANG; console.warn('language not loaded, using the default', e); }
   }
   plural = new Intl.PluralRules(locale());
   document.documentElement.lang = locale();
+}
+
+export const currentLang = () => code;
+
+/** Remember the choice for this device and reload: strings are read once, at start-up. */
+export function setLanguage(next) {
+  if (!LANGUAGES[next] || next === code) return;
+  setPref('lang', next);
+  location.reload();
 }
 
 /** BCP 47 locale for Intl (dates, numbers, plural rules). */

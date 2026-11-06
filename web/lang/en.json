@@ -64,6 +64,10 @@
     "profile": "Who watcheth: {name}"
   },
 
+  "lang": {
+    "choose": "Thy tongue"
+  },
+
   "theme": {
     "change": "{label} (press to change it)",
     "auto": "Theme: as thy device ordaineth",

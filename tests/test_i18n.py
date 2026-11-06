@@ -106,7 +106,9 @@ def test_translations_match_the_default() -> None:
 
 def test_every_language_file_is_registered() -> None:
     src = (WEB / "js" / "i18n.js").read_text(encoding="utf-8")
-    registered = set(re.findall(r"(\w+):", re.search(r"LANGUAGES = \{(.*?)\}", src).group(1)))
+    registered = set(
+        re.findall(r"^\s+(\w+): '", re.search(r"LANGUAGES = \{(.*?)\};", src, re.S).group(1), re.M)
+    )
     on_disk = {f.stem for f in LANG.glob("*.json")}
     assert registered == on_disk
 
@@ -116,3 +118,27 @@ def test_default_language_never_says_you() -> None:
     for k, v in flatten(load(DEFAULT)).items():
         for s in v.values() if isinstance(v, dict) else [v]:
             assert not re.search(r"\byou(r|rs|rself)?\b", s, re.I), f"{k}: {s}"
+
+
+def test_shipped_translations_are_complete() -> None:
+    # Missing keys would fall back to English mid-page; the shipped files translate everything.
+    base = set(flatten(load(DEFAULT)))
+    for f in LANG.glob("*.json"):
+        missing = base - set(flatten(json.loads(f.read_text(encoding="utf-8"))))
+        assert not missing, f"{f.name} lacks {sorted(missing)}"
+
+
+def test_language_names_match_files() -> None:
+    src = (WEB / "js" / "i18n.js").read_text(encoding="utf-8")
+    for code, name in re.findall(r"^\s+(\w+): '([^']+)',", src, re.M):
+        assert load(code)["_meta"]["name"] == name, code
+
+
+def test_css_fonts_exist() -> None:
+    css = (WEB / "css" / "app.css").read_text(encoding="utf-8")
+    urls = re.findall(r'url\("\.\./(vendor/fonts/[^"]+)"\)', css)
+    assert urls, "no vendored fonts referenced"
+    for u in urls:
+        assert (WEB / u).is_file(), u
+    i18n = (WEB / "js" / "i18n.js").read_text(encoding="utf-8")
+    assert set(re.findall(r"'(vendor/fonts/[^']+)'", i18n)) == set(urls), "preload list and @font-face differ"

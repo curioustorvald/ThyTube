@@ -2,6 +2,7 @@ import { html, render, useEffect, useState } from '../vendor/preact-htm.js';
 import { get } from './api.js';
 import { initI18n, t } from './i18n.js';
 import { Avatar, ProfileScreen } from './components/Profiles.js';
+import { LangPicker } from './components/LangPicker.js';
 import { StatusPill } from './components/StatusPill.js';
 import { Icon } from './icons.js';
 import { back, href, useRoute } from './router.js';
@@ -80,6 +81,7 @@ function App() {
       <span class="spacer"></span>
       <${StatusPill} />
       <${ThemeToggle} />
+      <${LangPicker} />
       <button class="ghost icon" aria-label=${t('nav.profile', { name: profile.name })} title=${profile.name}
         onClick=${() => store.set({ pickingProfile: true })}><${Avatar} p=${profile} /></button>
     </header>

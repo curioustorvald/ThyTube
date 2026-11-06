@@ -175,6 +175,34 @@ button.danger.solid { background: var(--bad); border-color: var(--bad); color: #
 button.ghost { background: transparent; border-color: transparent; }
 button.ghost:hover { background: var(--surface-2); }
 button.icon { padding: 0; width: 44px; }
+
+/* Language picker: icon (or icon + name) with the real <select> stretched invisibly over it. */
+.lang-pick { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  min-width: 44px; min-height: 44px; border-radius: var(--radius-s); color: var(--ink); cursor: pointer; }
+.lang-pick.named { padding: 0 0.8rem; color: var(--muted); font-size: 0.9rem; }
+.lang-pick:hover { background: var(--surface-2); }
+.lang-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lang-pick svg { width: 20px; height: 20px; }
+.lang-pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+/* Phones: the top bar has no room to spare; the picker stays on the profile screen (tap the avatar). */
+@media (max-width: 479px) { .topbar .lang-pick { display: none; } }
+
+/* Korean UI only: Hangul (incl. the Old Hangul jamo of Early Modern Korean: ㆍ, ㅺ…) always comes from the
+   vendored Noto Sans CJK KR subset, so it composes the same on every device. unicode-range keeps Latin text in
+   the system font and means the files are only fetched when Hangul is on screen. */
+@font-face {
+  font-family: "ThyTube Hangul"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../vendor/fonts/NotoSansCJKkr-2.004-Hangul-Regular.woff2") format("woff2");
+  unicode-range: U+1100-11FF, U+302E-302F, U+3131-318E, U+A960-A97C, U+AC00-D7A3, U+D7B0-D7FB;
+}
+@font-face {
+  font-family: "ThyTube Hangul"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../vendor/fonts/NotoSansCJKkr-2.004-Hangul-Bold.woff2") format("woff2");
+  unicode-range: U+1100-11FF, U+302E-302F, U+3131-318E, U+A960-A97C, U+AC00-D7A3, U+D7B0-D7FB;
+}
+:root:lang(ko) {
+  --font: "ThyTube Hangul", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+}
 button.small, .btn.small { min-height: 34px; padding: 0 0.7rem; font-size: 0.86rem; }
 button svg, .btn svg { width: 18px; height: 18px; flex: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

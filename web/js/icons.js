@@ -37,6 +37,7 @@ const P = {
   moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
   contrast: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z',
   user: 'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21c1-4 4-6 8-6s7 2 8 6',
+  globe: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM3.5 9h17M3.5 15h17M12 3c-2.6 2.6-3.8 5.6-3.8 9s1.2 6.4 3.8 9M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9',
 };
 
 // Optional filled overlay drawn on top of the stroked path.
