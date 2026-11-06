@@ -5,6 +5,8 @@
 <p align="center"><em>thy</em> (determiner, archaic): of or belonging to thee.<br>
 Not <em>your</em> tube. Not <em>their</em> tube. <strong>Thy</strong> tube.</p>
 
+<p align="center">English · <a href="README.ko.md">됴션말</a></p>
+
 ---
 
 ThyTube is a private YouTube caching server with a frontend of its own, for thy home network.
