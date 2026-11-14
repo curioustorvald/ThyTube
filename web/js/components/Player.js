@@ -20,6 +20,22 @@ const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 
 function trackKey(s) { return s ? `${s.lang}.${s.kind}` : 'off'; }
 
+// Subtitles are remembered per channel ('off' or a language, in prefs().subByChannel); a channel never set
+// follows the last choice made anywhere (prefs().subLang). If the channel's language is missing from this
+// video but the channel has them shown, the first track is shown (manual ones are listed first).
+function initialTrack(subs, channelId) {
+  const p = prefs();
+  const own = channelId ? p.subByChannel?.[channelId] : undefined;
+  const want = own ?? p.subLang;
+  if (want === 'off') return null;
+  return subs.find((s) => s.lang === want) || (own ? subs[0] || null : null);
+}
+function rememberTrack(s, channelId) {
+  const lang = s ? s.lang : 'off';
+  setPref('subLang', lang);
+  return channelId ? setPref('subByChannel', { ...prefs().subByChannel, [channelId]: lang }) : prefs();
+}
+
 // iOS (and Safari generally) only lets an element start playback with sound after a user gesture
 // has touched *that element*; the unlock then sticks for the element's lifetime. So the player
 // never re-creates its <video>: it borrows this one, and the first tap anywhere in the app unlocks
@@ -194,10 +210,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay, 
     // Autoplay can still be refused (e.g. a direct link opened with no tap yet): show the big play button.
     if (wasPlaying) v.play().catch((e) => { if (e.name === 'NotAllowedError') setStarted(false); });
     setStarted(wasPlaying);
-    // Subtitle choice: remember the language across videos.
-    const want = prefs().subLang;
-    const pick = want === 'off' ? null : subs.find((s) => s.lang === want) || null;
-    setTrack(pick);
+    setTrack(initialTrack(subs, video.channel?.id));
     // Media Session.
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -380,7 +393,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay, 
 
   // ---- settings -----------------------------------------------------------------------------
   function setSpeed(s) { vid.current.playbackRate = s; setP(setPref('speed', s)); }
-  function chooseTrack(s) { setTrack(s); setP(setPref('subLang', s ? s.lang : 'off')); setMenu(null); }
+  function chooseTrack(s) { setTrack(s); setP(rememberTrack(s, video.channel?.id)); setMenu(null); }
   function cycleSubs() {
     if (!subs.length) return;
     const i = subs.findIndex((s) => trackKey(s) === trackKey(track));
