@@ -20,12 +20,13 @@ on thine own disk.
 
 ## What it doth
 
-- **Library**: what is cached, what thou wast halfway through, filters per channel. No infinite
-  scroll, just a "Load more" button.
+- **Library**: what is cached, what thou wast halfway through, filters per channel, a channel drawn
+  by lot, or everything shuffled. No infinite scroll, just a "Load more" button.
 - **Player**: remembers where each profile stopped, shows chapters on the seek bar, and draws its
   own subtitles (YouTube's auto-captions, cleaned of their stutter). Double-tap to skip, keyboard
-  shortcuts on the desktop. When a video ends, it picks another from the same channel, with the
-  ones thou hast watched least twice as likely.
+  shortcuts on the desktop, and a theatre mode on wide screens. When a video ends, it picks another
+  from the same channel, with the ones thou hast watched least twice as likely, and those thou
+  hast oft cast aside ("Cast again") the less likely.
 - **Search**: searches YouTube through yt-dlp on the server, and takes pasted links too. Every
   result offers *Cache this video* and *Cache this creator…*. The latter opens the filter dialog
   with a live preview of which recent uploads would be caught.

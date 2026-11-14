@@ -92,6 +92,36 @@ def prune_sessions(conn: sqlite3.Connection) -> None:
     conn.execute("DELETE FROM play_sessions WHERE last_heartbeat_at < ?", (db.in_iso(days=-30),))
 
 
+def reroll_factor(count: int) -> float:
+    """Weight multiplier for a video this profile has cast aside `count` times in the channel shuffle.
+    Once barely matters (1.0), twice a little (0.8), thrice moderately (0.5), then ever less
+    (0.31, 0.2, 0.14, 0.1 …) but never zero, so nothing disappears from the shuffle for good."""
+    return 1.0 / (1.0 + (max(count - 1, 0) / 2) ** 2)
+
+
+def record_reroll(conn: sqlite3.Connection, profile_id: int | None, video_id: str) -> int:
+    """Count one "cast again" on `video_id` for this profile; returns the new count (0 if not recorded)."""
+    if profile_id is None:
+        return 0
+    with db.tx(conn):
+        known = conn.execute(
+            "SELECT (SELECT 1 FROM profiles WHERE id=?) AND (SELECT 1 FROM videos WHERE id=?)",
+            (profile_id, video_id),
+        ).fetchone()[0]
+        if not known:
+            return 0
+        conn.execute(
+            "INSERT INTO reroll_stats(profile_id, video_id, reroll_count, last_rerolled_at) VALUES(?,?,1,?)"
+            " ON CONFLICT(profile_id, video_id) DO UPDATE SET reroll_count=reroll_count+1,"
+            " last_rerolled_at=excluded.last_rerolled_at",
+            (profile_id, video_id, db.now_iso()),
+        )
+        row = conn.execute(
+            "SELECT reroll_count FROM reroll_stats WHERE profile_id=? AND video_id=?", (profile_id, video_id)
+        ).fetchone()
+    return int(row[0])
+
+
 def pick_next(
     conn: sqlite3.Connection,
     video_id: str,
@@ -101,16 +131,18 @@ def pick_next(
 ) -> dict[str, Any] | None:
     """Channel-random: a cached video from the same channel, not the current one and not already
     played this session (reset once exhausted). Videos whose watch count for this profile equals the
-    minimum among the candidates get weight 2, the rest weight 1."""
+    minimum among the candidates get weight 2, the rest weight 1. That weight is then scaled by
+    `reroll_factor` of how often this profile has cast the video aside before."""
     rng = rng or random.Random()
     cur = conn.execute("SELECT channel_id FROM videos WHERE id=?", (video_id,)).fetchone()
     if cur is None or cur["channel_id"] is None:
         return None
     rows = conn.execute(
-        "SELECT v.id, COALESCE(w.watch_count, 0) AS wc FROM videos v"
-        " LEFT JOIN watch_stats w ON w.video_id = v.id AND w.profile_id = ?"
-        " WHERE v.channel_id=? AND v.state='cached' AND v.id != ?",
-        (profile_id, cur["channel_id"], video_id),
+        "SELECT v.id, COALESCE(w.watch_count, 0) AS wc, COALESCE(r.reroll_count, 0) AS rc FROM videos v"
+        " LEFT JOIN watch_stats w ON w.video_id = v.id AND w.profile_id = :p"
+        " LEFT JOIN reroll_stats r ON r.video_id = v.id AND r.profile_id = :p"
+        " WHERE v.channel_id=:ch AND v.state='cached' AND v.id != :cur",
+        {"p": profile_id, "ch": cur["channel_id"], "cur": video_id},
     ).fetchall()
     if not rows:
         return None
@@ -120,6 +152,6 @@ def pick_next(
     if not candidates:
         candidates, reset = list(rows), True
     least = min(r["wc"] for r in candidates)
-    weights = [2 if r["wc"] == least else 1 for r in candidates]
+    weights = [(2 if r["wc"] == least else 1) * reroll_factor(r["rc"]) for r in candidates]
     choice = rng.choices(candidates, weights=weights, k=1)[0]
     return {"id": choice["id"], "reset": reset, "candidates": len(candidates)}

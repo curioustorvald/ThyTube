@@ -118,6 +118,7 @@ export function Watch({ id }) {
   const [mode, setModeState] = useState(() => prefs().nextMode);
   const [pick, setPick] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [theatre, setTheatreState] = useState(() => !!prefs().theatre);
   const skipped = useRef([]);
   const playerApi = useRef(null);
   // Opening a cached video starts it; one that finishes downloading while this page is open doesn't.
@@ -161,7 +162,16 @@ export function Watch({ id }) {
   useEffect(() => { if (mode === 'channel') fetchPick(); }, [id, mode, video?.state]);
 
   function setMode(m) { setModeState(m); setPref('nextMode', m); }
-  function reroll() { if (pick) skipped.current.push(pick.id); fetchPick(); }
+  function reroll() {
+    if (pick) {
+      skipped.current.push(pick.id);
+      // Remembered per profile: what is often cast aside comes up less often hereafter.
+      post('/playback/reroll', { video: pick.id }).catch(() => {});
+    }
+    fetchPick();
+  }
+  // Theatre: the player takes the full width and Hereafter moves below (only where it would sit beside).
+  function toggleTheatre() { const on = !theatre; setTheatreState(on); setPref('theatre', on); }
   function playNext() {
     if (mode === 'queue') {
       const q = getQueue();
@@ -190,10 +200,11 @@ export function Watch({ id }) {
   const seek = (s) => playerApi.current?.seek(s);
   const myCount = video.me?.watch_count || 0;
 
-  return html`<div class="watch">
+  return html`<div class="watch ${theatre ? 'theatre' : ''}">
     <div class="watch-main">
       ${cached
         ? html`<${Player} video=${video} api=${playerApi} autoplay=${autoplay.current} onEnded=${onEnded} onTime=${setTime}
+            theatre=${theatre} onTheatre=${toggleTheatre}
             onNext=${(mode === 'channel' && pick) || (mode === 'queue' && queue.length) ? playNext : null} />`
         : html`<${NotCached} id=${id} video=${video.missing && !video.title ? null : video} reload=${load} />`}
       <h1 class="watch-title">${video.title || id}</h1>

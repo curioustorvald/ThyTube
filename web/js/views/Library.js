@@ -2,6 +2,7 @@ import { html, useEffect, useState } from '../../vendor/preact-htm.js';
 import { get, post } from '../api.js';
 import { VideoCard } from '../components/VideoCard.js';
 import { t } from '../i18n.js';
+import { Icon } from '../icons.js';
 import { href } from '../router.js';
 import { toast, toastError, useStore, prefs } from '../store.js';
 import { debounce } from '../util.js';
@@ -56,10 +57,14 @@ function ContinueRow() {
   </section>`;
 }
 
+const newSeed = () => Math.random().toString(36).slice(2, 10);
+
 export function Library({ query }) {
   const [channels, setChannels] = useState([]);
   const channel = query.channel || '';
   const sort = query.sort || 'published';
+  const seed = sort === 'random' ? query.seed || '' : '';
+  const byLot = query.rand === 'channel' && !!channel; // the channel was drawn at random
   const showEvicted = query.evicted === '1';
   const [q, setQ] = useState(query.q || '');
   const [qLive, setQLive] = useState(query.q || '');
@@ -67,29 +72,44 @@ export function Library({ query }) {
 
   useEffect(() => { get('/channels').then((r) => setChannels(r.items)).catch(() => {}); }, []);
   const nav = (patch) => {
-    const next = { channel, sort: sort === 'published' ? '' : sort, evicted: showEvicted ? '1' : '', ...patch };
+    const next = { channel, sort: sort === 'published' ? '' : sort, seed, rand: byLot ? 'channel' : '', evicted: showEvicted ? '1' : '', ...patch };
     location.hash = href('/', next);
   };
+  const withVideos = channels.filter((c) => c.cached_count > 0);
+  // Random channel: one drawn by lot (not the one shown now), its newest videos first. Press again for another.
+  function randomChannel() {
+    const pool = withVideos.filter((c) => c.id !== channel);
+    if (!pool.length) return;
+    nav({ channel: pool[Math.floor(Math.random() * pool.length)].id, sort: '', seed: '', rand: 'channel' });
+  }
+  // Random video: every channel, shuffled. Press again to shuffle anew.
+  const randomVideos = () => nav({ channel: '', sort: 'random', seed: newSeed(), rand: '' });
+  const shuffledAll = sort === 'random' && !channel;
 
-  const listQuery = { state: showEvicted ? 'library' : 'cached', channel: channel || undefined, sort, q: qLive || undefined };
+  const listQuery = { state: showEvicted ? 'library' : 'cached', channel: channel || undefined, sort, seed: seed || undefined, q: qLive || undefined };
   return html`<div>
     ${!channel && !qLive && html`<${ContinueRow} />`}
     <div class="section-head"><h2>${channel ? (channels.find((c) => c.id === channel)?.title || t('library.channelFallback')) : t('library.title')}</h2>
       ${channel && html`<a class="small" href=${href('/channel/' + channel)}>${t('library.channelPage')}</a>`}</div>
-    ${channels.length > 1 && html`<div class="chips" style="margin-bottom:0.6rem">
-      <button class="chip ${!channel ? 'on' : ''}" onClick=${() => nav({ channel: '' })}>${t('library.all')}</button>
-      ${channels.filter((c) => c.cached_count > 0).map((c) => html`<button class="chip ${channel === c.id ? 'on' : ''}" onClick=${() => nav({ channel: c.id })}>
+    ${withVideos.length > 0 && html`<div class="chips" style="margin-bottom:0.6rem">
+      <button class="chip ${!channel && !shuffledAll ? 'on' : ''}" onClick=${() => nav({ channel: '', rand: '', ...(sort === 'random' ? { sort: '', seed: '' } : {}) })}>${t('library.all')}</button>
+      ${withVideos.length > 1 && html`<button class="chip ${byLot ? 'on' : ''}" title=${t('library.randomChannelHint')} onClick=${randomChannel}>
+        <${Icon} name="dice" size="18" />${t('library.randomChannel')}</button>`}
+      <button class="chip ${shuffledAll ? 'on' : ''}" title=${t('library.randomVideoHint')} onClick=${randomVideos}>
+        <${Icon} name="shuffle" size="18" />${t('library.randomVideo')}</button>
+      ${withVideos.map((c) => html`<button class="chip ${channel === c.id ? 'on' : ''}" onClick=${() => nav({ channel: c.id, rand: '' })}>
         ${c.avatar && html`<img src=${c.avatar} alt="" loading="lazy" />`}${c.title || c.id}</button>`)}
     </div>`}
     <div class="row wrap" style="margin-bottom:0.8rem">
       <input type="search" placeholder=${t('library.filterTitles')} value=${q} style="max-width:320px"
         onInput=${(e) => { setQ(e.target.value); setQDebounced(e.target.value); }} />
-      <select value=${sort} style="width:auto" onChange=${(e) => nav({ sort: e.target.value === 'published' ? '' : e.target.value })}>
+      <select value=${sort} style="width:auto" onChange=${(e) => { const s = e.target.value; nav({ sort: s === 'published' ? '' : s, seed: s === 'random' ? newSeed() : '' }); }}>
         <option value="published">${t('library.sortPublished')}</option>
         <option value="downloaded">${t('library.sortDownloaded')}</option>
         <option value="watched">${t('library.sortWatched')}</option>
         <option value="title">${t('library.sortTitle')}</option>
         <option value="duration">${t('library.sortDuration')}</option>
+        <option value="random">${t('library.sortRandom')}</option>
       </select>
       <label class="check small"><input type="checkbox" checked=${showEvicted} onChange=${(e) => nav({ evicted: e.target.checked ? '1' : '' })} /> ${t('library.showRemoved')}</label>
     </div>

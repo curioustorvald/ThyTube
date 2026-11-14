@@ -152,6 +152,34 @@ def test_next_weighting(conn) -> None:
     assert p["reset"] is True
 
 
+def test_reroll_factor_grows_gently() -> None:
+    f = playback.reroll_factor
+    assert f(0) == f(1) == 1.0  # never, or once: no effect
+    assert 0.75 <= f(2) < 1.0  # twice: small
+    assert 0.4 <= f(3) <= 0.6  # thrice: moderate
+    assert f(4) < f(3) and f(10) < f(4) and f(10) > 0
+
+
+def test_next_weighting_with_rerolls(conn) -> None:
+    conn.execute("INSERT INTO profiles(name, created_at) VALUES('Ann', ?)", (db.now_iso(),))
+    conn.execute("INSERT INTO profiles(name, created_at) VALUES('Bob', ?)", (db.now_iso(),))
+    for vid in ("cur00000000", "aaa00000000", "bbb00000000"):
+        _video(conn, vid)
+    for _ in range(3):
+        assert playback.record_reroll(conn, 1, "aaa00000000") > 0
+    assert playback.record_reroll(conn, 1, "aaa00000000") == 4
+    assert playback.record_reroll(conn, None, "aaa00000000") == 0
+    assert playback.record_reroll(conn, 1, "nosuchvideo") == 0
+    rng = random.Random(1)
+    picks = [playback.pick_next(conn, "cur00000000", 1, [], rng)["id"] for _ in range(3000)]
+    share = picks.count("aaa00000000") / len(picks)
+    w = playback.reroll_factor(4)
+    assert abs(share - w / (w + 1)) < 0.04
+    # Other profiles aren't affected.
+    picks = [playback.pick_next(conn, "cur00000000", 2, [], rng)["id"] for _ in range(3000)]
+    assert 0.45 < picks.count("aaa00000000") / len(picks) < 0.55
+
+
 def test_eviction_order(cfg, conn) -> None:
     _video(conn, "watched3xxx", total_watch_count=3, last_watched_at=db.in_iso(days=-1))
     _video(conn, "watched1old", total_watch_count=1, last_watched_at=db.in_iso(days=-20))

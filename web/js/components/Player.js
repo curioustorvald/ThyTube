@@ -14,6 +14,8 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const SUB_SIZES = { s: '0.9rem', m: '1.15rem', l: '1.45rem', xl: '1.85rem' };
 const SUB_BGS = [[0, 'bgNone'], [0.45, 'bgLight'], [0.75, 'bgSolid']]; // [opacity, player.* key]
 const HEARTBEAT_MS = 15000;
+// Where the Watch page puts Hereafter beside the player (keep in step with app.css), so theatre mode means something.
+const WIDE = '(min-width: 1100px)';
 const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
 
 function trackKey(s) { return s ? `${s.lang}.${s.kind}` : 'off'; }
@@ -42,7 +44,7 @@ function sharedVideo() {
 }
 sharedVideo(); // create it (and its unlock hook) at start-up, before the first tap
 
-export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }) {
+export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay, theatre, onTheatre }) {
   const box = useRef(null);
   const slot = useRef(null);
   const vid = useRef(sharedVideo());
@@ -360,6 +362,7 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
       else if (k === 'ArrowLeft') { seekBy(-5); flash('l', '−5 s'); }
       else if (k === 'ArrowRight') { seekBy(5); flash('r', '+5 s'); }
       else if (k === 'f') toggleFs();
+      else if (k === 't' && onTheatre && matchMedia(WIDE).matches) onTheatre();
       else if (k === 'm') { v.muted = !v.muted; setMuted(v.muted); }
       else if (k === 'c') cycleSubs();
       else if (k === '>' || k === '<') {
@@ -453,6 +456,8 @@ export function Player({ video, onEnded, onNext, onTime, api: apiRef, autoplay }
           ${subs.length > 0 && html`<button onClick=${() => setMenu(menu === 'subs' ? null : 'subs')} aria-label=${tr('player.subtitles')}
             class=${track ? 'active' : ''} aria-pressed=${!!track}><${Icon} name="cc" /></button>`}
           <button onClick=${() => setMenu(menu === 'settings' ? null : 'settings')} aria-label=${tr('player.settings')}><${Icon} name="gear" /></button>
+          ${onTheatre && html`<button class="theatre-btn" onClick=${onTheatre} aria-label=${theatre ? tr('player.theatreOff') : tr('player.theatre')}
+            title=${theatre ? tr('player.theatreOff') : tr('player.theatre')}><${Icon} name=${theatre ? 'sidebar' : 'theatre'} /></button>`}
           <button onClick=${toggleFs} aria-label=${tr('player.fullscreen')}><${Icon} name=${fs ? 'exitfull' : 'full'} /></button>
         </div>
       </div>

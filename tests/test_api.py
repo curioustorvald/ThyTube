@@ -247,3 +247,42 @@ def test_next_endpoint(client, conn) -> None:
     assert r["video"]["id"] == "nextOTHER01"
     r = client.get("/api/next", params={"video": "nextCUR0001", "exclude": "nextOTHER01"}).json()
     assert r["video"]["id"] == "nextOTHER01" and r["reset"]
+
+
+def test_reroll_endpoint(client, conn) -> None:
+    pid = client.post("/api/profiles", json={"name": "Ann"}).json()["id"]
+    conn.execute(
+        "INSERT INTO videos(id, channel_id, state, origin, discovered_at) VALUES('rerollVID01',?,'cached','manual',?)",
+        (CH, db.now_iso()),
+    )
+    h = {"X-Profile": str(pid)}
+    assert client.post("/api/playback/reroll", json={"video": "rerollVID01"}, headers=h).json()["count"] == 1
+    assert client.post("/api/playback/reroll", json={"video": "rerollVID01"}, headers=h).json()["count"] == 2
+    assert client.post("/api/playback/reroll", json={"video": "rerollVID01"}).json()["count"] == 0
+    assert client.post("/api/playback/reroll", json={"video": "bad"}, headers=h).status_code >= 400
+    # A reroll doesn't make the video look watched.
+    assert client.get("/api/videos/rerollVID01", headers=h).json()["profiles"] == []
+
+
+def test_random_sort_is_stable_per_seed(client, conn) -> None:
+    ids = [f"shuffle{i:04d}" for i in range(25)]
+    for vid in ids:
+        conn.execute(
+            "INSERT INTO videos(id, channel_id, state, origin, discovered_at) VALUES(?,?,'cached','manual',?)",
+            (vid, CH, db.now_iso()),
+        )
+
+    def walk(seed: str) -> list[str]:
+        out, cursor = [], None
+        while True:
+            params = {"sort": "random", "seed": seed, "limit": 7, **({"cursor": cursor} if cursor else {})}
+            r = client.get("/api/videos", params=params).json()
+            out += [v["id"] for v in r["items"]]
+            cursor = r["next_cursor"]
+            if not cursor:
+                return out
+
+    a = walk("one")
+    assert sorted(a) == ids and len(set(a)) == len(ids)  # every video once across pages
+    assert walk("one") == a
+    assert walk("two") != a and a != ids

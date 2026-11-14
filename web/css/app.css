@@ -427,6 +427,19 @@ label.check input { width: 20px; height: 20px; accent-color: var(--accent); }
 .upnext { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0.75rem; }
 .upnext .vcard .thumb { width: 44%; }
 
+/* Theatre mode (wide screens only, where Hereafter would otherwise sit beside the player): the player takes
+   the whole width, and Hereafter and the chapters go below it, side by side. */
+.controls .theatre-btn { display: none; }
+@media (min-width: 1100px) {
+  .controls .theatre-btn { display: inline-flex; }
+  .player:fullscreen .controls .theatre-btn { display: none; }
+  main:has(.watch.theatre) { max-width: 1680px; }
+  .watch.theatre { grid-template-columns: minmax(0, 1fr); }
+  .watch.theatre .player { max-height: calc(100vh - var(--header-h) - 2.5rem); }
+  .watch.theatre > aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+  .watch.theatre > aside > * + * { margin-top: 0; }
+}
+
 /* ---- dialogs / overlays ------------------------------------------------------------------ */
 
 .backdrop {

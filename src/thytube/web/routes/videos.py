@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from typing import Any
 
@@ -33,7 +34,15 @@ SORTS = {
     "title": ("LOWER(COALESCE(v.title, ''))", "ASC"),
     "duration": ("COALESCE(v.duration_s, 0)", "DESC"),
     "watched": ("COALESCE(v.last_watched_at, '')", "DESC"),
+    # A shuffle that stays put across pages: the order is fixed by the client's `seed`.
+    "random": ("thy_shuffle(:seed, v.id)", "ASC"),
 }
+
+
+def _shuffle_key(seed: str, video_id: str) -> str:
+    return hashlib.blake2b(f"{seed}\0{video_id}".encode(), digest_size=8).hexdigest()
+
+
 STATE_GROUPS = {
     "cached": ["cached"],
     "library": ["cached", "evicted"],
@@ -50,6 +59,7 @@ def list_videos(
     q: str | None = None,
     cursor: str | None = None,
     limit: int = 40,
+    seed: str = "",
     conn: sqlite3.Connection = Depends(get_conn),
     profile: int | None = Depends(profile_id),
 ) -> dict[str, Any]:
@@ -59,6 +69,9 @@ def list_videos(
     states = STATE_GROUPS.get(state) or [s for s in state.split(",") if s]
     expr, direction = SORTS[sort]
     params: dict[str, Any] = {"profile": profile, "limit": limit + 1}
+    if sort == "random":
+        conn.create_function("thy_shuffle", 2, _shuffle_key, deterministic=True)
+        params["seed"] = seed[:64]
     where = [f"v.state IN ({','.join(f':s{i}' for i in range(len(states)))})"]
     params.update({f"s{i}": s for i, s in enumerate(states)})
     if channel:

@@ -308,6 +308,18 @@ async def heartbeat(request: Request, cfg: Config = Depends(get_cfg)) -> dict[st
         conn.close()
 
 
+@router.post("/playback/reroll")
+def reroll(
+    body: dict[str, Any] = Body(...),
+    conn: sqlite3.Connection = Depends(get_conn),
+    header_profile: int | None = Depends(profile_id),
+) -> dict[str, Any]:
+    """The user cast aside the shuffle's pick: remember it, so it comes up less often for them."""
+    video = str(body.get("video") or "")
+    check_video_id(video)
+    return {"ok": True, "count": playback.record_reroll(conn, header_profile, video)}
+
+
 @router.get("/next")
 def next_video(
     video: str,
