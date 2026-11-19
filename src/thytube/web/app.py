@@ -14,7 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .. import __version__
 from ..config import Config
 from .common import ApiError
-from .routes import manage, system, videos
+from .routes import manage, playlists, system, videos
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/vtt", ".vtt")
@@ -49,7 +49,7 @@ def create_app(cfg: Config) -> FastAPI:
             response.headers["Cache-Control"] = "no-store"
         return response
 
-    for r in (system.router, videos.router, manage.router):
+    for r in (system.router, videos.router, manage.router, playlists.router):
         app.include_router(r, prefix="/api")
 
     # Production: Apache serves these. Development: let uvicorn do it.

@@ -17,10 +17,15 @@ from ..config import Config
 from ..discovery import channel_meta_from_listing, flat_entries
 from ..health import Health
 from ..ytdlp import classify as C
-from ..ytdlp.runner import Runner, channel_url
+from ..ytdlp.runner import Runner, channel_url, playlist_url
 from .common import CHANNEL_ID, VIDEO_ID, ApiError, TTLCache
 
 _cache = TTLCache(600)
+
+PLAYLIST_ID = re.compile(r"^[A-Za-z0-9_-]{12,64}$")
+PLAYLIST_MAX = 1000  # entries read from a YouTube playlist (imports and syncs)
+# What a flat playlist listing calls entries it can't show.
+UNAVAILABLE_TITLES = {"[Private video]", "[Deleted video]", "[Unavailable video]"}
 _sems: dict[int, asyncio.Semaphore] = {}
 
 
@@ -116,7 +121,9 @@ async def search(cfg: Config, q: str, kind: str, n: int = 20) -> list[dict[str, 
 
 
 def parse_url(text: str) -> tuple[str, str] | None:
-    """('video', id) | ('channel', UC…) | ('channel_url', url) | None."""
+    """('video', id) | ('channel', UC…) | ('channel_url', url) | ('playlist', id) | None.
+
+    A watch URL that also carries &list= is a video; only /playlist?list=… is a playlist."""
     t = text.strip()
     if VIDEO_ID.match(t) and not t.startswith("UC"):
         return ("video", t)
@@ -140,6 +147,8 @@ def parse_url(text: str) -> tuple[str, str] | None:
     qs = parse_qs(u.query)
     if parts[:1] == ["watch"] and qs.get("v") and VIDEO_ID.match(qs["v"][0]):
         return ("video", qs["v"][0])
+    if parts[:1] == ["playlist"] and qs.get("list") and PLAYLIST_ID.match(qs["list"][0]):
+        return ("playlist", qs["list"][0])
     if len(parts) >= 2 and parts[0] in ("shorts", "live", "embed", "v") and VIDEO_ID.match(parts[1]):
         return ("video", parts[1])
     if len(parts) >= 2 and parts[0] == "channel" and CHANNEL_ID.match(parts[1]):
@@ -215,3 +224,50 @@ async def video_metadata(cfg: Config, video_id: str) -> dict[str, Any]:
     }
     _cache.set(key, brief)
     return brief
+
+
+def parse_playlist(text: str) -> str | None:
+    """A YouTube playlist ID from a playlist URL, a watch URL with &list=, or a bare ID."""
+    t = text.strip()
+    if PLAYLIST_ID.match(t):
+        return t
+    if not re.match(r"^https?://", t) and re.match(r"^(www\.|m\.|music\.)?youtube\.com/", t):
+        t = "https://" + t
+    u = urlparse(t)
+    host = (u.hostname or "").lower()
+    if not host.endswith("youtube.com"):
+        return None
+    lst = parse_qs(u.query).get("list")
+    return lst[0] if lst and PLAYLIST_ID.match(lst[0]) else None
+
+
+async def playlist_listing(cfg: Config, playlist_id: str, *, fresh: bool = False) -> dict[str, Any]:
+    """A YouTube playlist's title, owner and (up to PLAYLIST_MAX) entries, flat and in order."""
+    key = f"playlist:{playlist_id}"
+    if not fresh and (hit := _cache.get(key)) is not None:
+        return hit
+    runner = Runner(cfg)
+    data = await _run_json(
+        cfg,
+        runner.flat_listing_argv(playlist_url(playlist_id), PLAYLIST_MAX, interactive=True),
+        "resolve",
+        timeout=max(cfg.ytdlp.search_timeout_s, 180),
+    )
+    seen: set[str] = set()
+    entries = []
+    for e in flat_entries(data):
+        if e["id"] in seen or e.get("title") in UNAVAILABLE_TITLES:
+            continue
+        seen.add(e["id"])
+        entries.append(e)
+    result = {
+        "id": playlist_id,
+        "title": data.get("title") or playlist_id,
+        "owner": data.get("channel") or data.get("uploader"),
+        "owner_id": data.get("channel_id") if CHANNEL_ID.match(str(data.get("channel_id") or "")) else None,
+        "description": (data.get("description") or "")[:2000],
+        "entries": entries,
+        "truncated": len(entries) >= PLAYLIST_MAX,
+    }
+    _cache.set(key, result)
+    return result

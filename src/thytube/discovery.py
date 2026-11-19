@@ -92,6 +92,7 @@ def flat_entries(data: dict[str, Any]) -> list[dict[str, Any]]:
                 "is_short": "/shorts/" in url,
                 "thumb_url": thumbs[-1]["url"] if thumbs else None,
                 "channel_id": e.get("channel_id"),
+                "channel": e.get("channel") or e.get("uploader"),
             }
         )
     return out
@@ -277,8 +278,12 @@ class Discovery:
                 if existing is not None:
                     state = existing["state"]
                     ours = existing["subscription_id"] == sub["id"] and existing["origin"] == "subscription"
-                    reevaluable = state == "filtered" and (existing["filter_reason"] or "").startswith(
-                        ("title", "before subscription", "duration", "shorts", "streams")
+                    # 'discovered' = known only from a playlist, never acted on: free for the taking.
+                    reevaluable = state == "discovered" or (
+                        state == "filtered"
+                        and (existing["filter_reason"] or "").startswith(
+                            ("title", "before subscription", "duration", "shorts", "streams")
+                        )
                     )
                     if wants and reevaluable:
                         self._queue_existing(conn, e, sub)
@@ -346,12 +351,15 @@ class Discovery:
                 ).fetchone()
                 match = next((s for s in all_subs if filters.listing_verdict(s, e).ok), None)
                 if existing is not None:
-                    # Title-filtered items may match after the rules were edited. Evicted ones are never
+                    # Title-filtered items may match after the rules were edited, and videos known only
+                    # from a playlist ('discovered') are free for the taking. Evicted ones are never
                     # re-queued automatically.
-                    if (
-                        match
-                        and existing["state"] == "filtered"
-                        and (existing["filter_reason"] or "").startswith("title")
+                    if match and (
+                        existing["state"] == "discovered"
+                        or (
+                            existing["state"] == "filtered"
+                            and (existing["filter_reason"] or "").startswith("title")
+                        )
                     ):
                         self._queue_existing(conn, e, match)
                         queued += 1
@@ -404,8 +412,8 @@ class Discovery:
 
     def _queue_existing(self, conn: sqlite3.Connection, e: dict[str, Any], sub: sqlite3.Row) -> None:
         conn.execute(
-            "UPDATE videos SET state='queued', subscription_id=?, filter_reason=NULL, max_height=?, queued_at=?,"
-            " attempts=0, next_attempt_at=NULL WHERE id=?",
+            "UPDATE videos SET state='queued', origin='subscription', subscription_id=?, filter_reason=NULL,"
+            " max_height=?, queued_at=?, attempts=0, next_attempt_at=NULL WHERE id=?",
             (sub["id"], sub["max_height"], db.now_iso(), e["id"]),
         )
 

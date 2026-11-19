@@ -10,6 +10,9 @@ Point ``ytdlp.binary`` at this file. Behaviour is driven by environment variable
                        "subtitles": ["en"], "auto_captions": ["ko"], "filesize": 123,
                        "download_mode": "...", "subs_mode": "..."}},  (mode = metadata call)
                        "channels": {"UC…": {"title": "...", "handle": "@x", "count": 30}},
+                       "playlists": {"PL…": {"title": "...", "owner": "...", "video_ids": [...],
+                       "private": 1, "missing": false}},  (private = extra "[Private video]" entries;
+                       unlisted playlists get 5 made-up videos)
                        "version": "2099.01.01"}. Re-read on every call, so tests can change it.
   FAKE_YTDLP_LOG       append one JSON line per invocation (argv) to this file
   FAKE_YTDLP_SAMPLE_DIR  where generated sample MP4s are cached (default ~/.cache/thytube-fake)
@@ -383,6 +386,37 @@ def main() -> None:
         elif vmode != "ok":
             fail(vmode)
         print(json.dumps(video_info(sc, vid)))
+        return
+    if "/playlist?list=" in url:
+        pl_id = url.split("list=")[1].split("&")[0]
+        pl = sc.get("playlists", {}).get(pl_id, {})
+        if pl.get("missing"):
+            sys.stderr.write(f"ERROR: [youtube:tab] {pl_id}: The playlist does not exist.\n")
+            sys.exit(1)
+        limit = int(opts.get("--playlist-end", ["50"])[0])
+        ids = pl.get("video_ids") or [fake_id(f"{pl_id}-{i}") for i in range(pl.get("count", 5))]
+        entries = [flat_entry(sc, v) for v in ids[:limit]]
+        entries += [
+            {
+                "_type": "url",
+                "id": fake_id(f"{pl_id}-private-{i}"),
+                "title": "[Private video]",
+                "duration": None,
+            }
+            for i in range(pl.get("private", 0))
+        ]
+        print(
+            json.dumps(
+                {
+                    "_type": "playlist",
+                    "id": pl_id,
+                    "title": pl.get("title", "A fake playlist"),
+                    "channel": pl.get("owner", "Someone"),
+                    "description": pl.get("description", ""),
+                    "entries": entries,
+                }
+            )
+        )
         return
     if "/channel/" in url or "/@" in url:
         if "/@" in url:

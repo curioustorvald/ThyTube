@@ -30,6 +30,9 @@ on thine own disk.
 - **Search**: searches YouTube through yt-dlp on the server, and takes pasted links too. Every
   result offers *Cache this video* and *Cache this creator…*. The latter opens the filter dialog
   with a live preview of which recent uploads would be caught.
+- **Playlists**: make thine own, or bring one hither from YouTube by its link (and fetch it anew
+  later for what was added there). Play them in order or shuffled; the videos thou hast not cached
+  yet abide in the list until thou cachest them, one by one or all at once.
 - **A pool that keeps its promise**: it never exceeds its budget. The least re-watched videos are
   removed first; fresh, unwatched downloads get a grace period; pinned videos stay; nothing is
   removed while it is playing.

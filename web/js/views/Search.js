@@ -1,6 +1,7 @@
 import { html, useEffect, useState } from '../../vendor/preact-htm.js';
 import { get, post } from '../api.js';
 import { FilterDialog } from '../components/FilterDialog.js';
+import { AddToPlaylist, ImportDialog } from '../components/PlaylistDialogs.js';
 import { locale, t } from '../i18n.js';
 import { Icon } from '../icons.js';
 import { go, href } from '../router.js';
@@ -9,6 +10,7 @@ import { fmtDuration, looksLikeUrl, STATE_BADGE, stateLabel } from '../util.js';
 
 function VideoResult({ r, onCreator, onCached }) {
   const [preview, setPreview] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [state, setState] = useState(r.state);
   async function cache() {
     try {
@@ -31,12 +33,31 @@ function VideoResult({ r, onCreator, onCached }) {
             ? html`<a class="btn small primary" href=${href('/watch/' + r.id)}><${Icon} name="play" size="16" /> ${t('search.watch')}</a>`
             : html`<button class="small primary" disabled=${busy} onClick=${cache}><${Icon} name="download" size="16" /> ${busy ? t('search.queued') : t('common.cacheThisVideo')}</button>`}
           ${r.channel?.id && html`<button class="small" onClick=${() => onCreator(r.channel)}>${t('common.cacheThisCreator')}</button>`}
+          <button class="small" onClick=${() => setAdding(true)}><${Icon} name="playlist" size="16" /> ${t('search.toPlaylist')}</button>
           ${!watchable && html`<button class="small ghost" onClick=${() => setPreview(!preview)}><${Icon} name="eye" size="16" /> ${preview ? t('search.closePreview') : t('search.preview')}</button>`}
         </div>
       </div>
     </div>
     ${preview && html`<div class="embed" style="margin-top:0.6rem"><iframe src=${`https://www.youtube-nocookie.com/embed/${r.id}?autoplay=1&rel=0`}
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title=${t('common.youtubePreview')}></iframe></div>`}
+    ${adding && html`<${AddToPlaylist} video=${r} onClose=${() => setAdding(false)} />`}
+  </li>`;
+}
+
+// A pasted YouTube playlist link: what it holds, and the way to import it.
+function PlaylistResult({ p, url }) {
+  const [importing, setImporting] = useState(false);
+  return html`<li class="row">
+    <div class="thumb" style="width:38%;max-width:220px">${p.items[0] && html`<img src=${p.items[0].thumb} alt="" loading="lazy" />`}</div>
+    <div class="grow">
+      <div class="vtitle">${p.title}</div>
+      <div class="vsub">${[p.owner, t('playlist.previewCounts', { count: p.count, cached: p.cached })].filter(Boolean).join(' · ')}</div>
+      <div class="result-actions">
+        ${p.imported_as && html`<a class="btn small" href=${href('/playlist/' + p.imported_as)}>${t('playlist.openIt')}</a>`}
+        <button class="small primary" onClick=${() => setImporting(true)}><${Icon} name="download" size="16" /> ${t('playlist.import')}…</button>
+      </div>
+    </div>
+    ${importing && html`<${ImportDialog} initialUrl=${url} initialPreview=${p} onClose=${() => setImporting(false)} />`}
   </li>`;
 }
 
@@ -96,6 +117,7 @@ export function Search({ query }) {
     ${error && html`<div class="error-box">${error}</div>`}
     ${resolved?.type === 'video' && html`<ul class="list"><${VideoResult} r=${resolved.video} onCreator=${setCreator} /></ul>`}
     ${resolved?.type === 'channel' && html`<ul class="list"><${ChannelResult} c=${resolved.channel} onCreator=${setCreator} /></ul>`}
+    ${resolved?.type === 'playlist' && html`<ul class="list"><${PlaylistResult} p=${resolved.playlist} url=${q} /></ul>`}
     ${results && (results.length
       ? html`<ul class="list results">${results.map((r) => (r.type === 'channel'
         ? html`<${ChannelResult} key=${r.id} c=${r} onCreator=${setCreator} />`

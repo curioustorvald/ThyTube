@@ -1,16 +1,22 @@
-import { html, useCallback, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
+import { html, useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import { del, get, post } from '../api.js';
 import { Confirm } from '../components/Dialog.js';
 import { Player } from '../components/Player.js';
+import { AddToPlaylist } from '../components/PlaylistDialogs.js';
 import { VideoBadges, VideoCard } from '../components/VideoCard.js';
 import { t } from '../i18n.js';
 import { Icon } from '../icons.js';
 import { go, href } from '../router.js';
 import { prefs, setPref, store, toast, toastError, useStore } from '../store.js';
 import { fmtBytes, fmtDate, fmtDuration, parseTimestamp, reasonText, stateLabel } from '../util.js';
+import { playlistPlayed, setPlaylistPlayed } from './Playlists.js';
 
 // [mode, label key, icon]
 const MODES = [['channel', 'watch.modeChannel', 'shuffle'], ['queue', 'watch.modeQueue', 'list'], ['repeat', 'watch.modeRepeat', 'repeat'], ['off', 'watch.modeOff', 'stop']];
+// Offered (and chosen) only when the video was opened from a playlist (#/watch/<id>?list=<playlist>).
+const PLAYLIST_MODE = ['playlist', 'watch.modePlaylist', 'playlist'];
+// The remembered mode; 'playlist' is never stored, as it needs a playlist to follow.
+const savedMode = () => (MODES.some(([m]) => m === prefs().nextMode) ? prefs().nextMode : 'channel');
 
 // Session-scoped play history (for "don't repeat until all are used up") and the user-built queue.
 function played() { try { return JSON.parse(sessionStorage.getItem('thytube.played')) || []; } catch { return []; } }
@@ -61,14 +67,47 @@ function Chapters({ chapters, time, onSeek }) {
     </ul></div>`;
 }
 
-function UpNext({ video, mode, setMode, pick, reroll, playNext, queue }) {
+// The playlist being played, with the current video marked; scrolled so that it is in view.
+function PlaylistNow({ playlist, id }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const ul = ref.current;
+    const on = ul?.querySelector('li.on');
+    if (on) ul.scrollTop = Math.max(0, on.offsetTop - ul.clientHeight / 3);
+  }, [id, playlist.id]);
+  return html`<ol class="pl-now" ref=${ref}>${playlist.items.map((v, i) => html`<li key=${v.id}
+      class=${v.id === id ? 'on' : v.state !== 'cached' ? 'dim' : ''}>
+    <a href=${href('/watch/' + v.id, { list: playlist.id })} aria-current=${v.id === id ? 'true' : undefined}>
+      <span class="n">${i + 1}</span><span class="ttl">${v.title || v.id}</span>
+      <span class="d">${v.state === 'cached' ? (v.duration_s ? fmtDuration(v.duration_s) : '') : stateLabel(v.state)}</span></a></li>`)}</ol>`;
+}
+
+function PlaylistUpNext({ playlist, id, next, shuffle, toggleShuffle, reroll, restart, playNext }) {
+  const pos = playlist.items.findIndex((v) => v.id === id) + 1;
+  return html`<div class="stack">
+    <div class="row between small"><a href=${href('/playlist/' + playlist.id)}><strong>${playlist.title}</strong></a>
+      ${pos > 0 && html`<span class="muted">${pos} / ${playlist.items.length}</span>`}</div>
+    ${next
+      ? html`<${VideoCard} v=${next} to=${href('/watch/' + next.id, { list: playlist.id })} />
+          <div class="row wrap">
+            ${shuffle && html`<button class="small" onClick=${reroll}><${Icon} name="refresh" size="16" /> ${t('watch.reroll')}</button>`}
+            <button class="small primary" onClick=${playNext}><${Icon} name="next" size="16" /> ${t('watch.playNow')}</button></div>`
+      : html`<p class="small muted">${t(shuffle ? 'watch.playlistAllPlayed' : 'watch.playlistEnd')}</p>
+          ${shuffle && html`<div><button class="small" onClick=${restart}>${t('watch.playlistRestart')}</button></div>`}`}
+    <label class="check small"><input type="checkbox" checked=${shuffle} onChange=${toggleShuffle} /> ${t('watch.playlistShuffle')}</label>
+    <${PlaylistNow} playlist=${playlist} id=${id} />
+  </div>`;
+}
+
+function UpNext({ video, modes, mode, setMode, pick, reroll, playNext, queue, playlistPart }) {
   return html`<div class="upnext stack">
     <div class="row between"><h3>${t('watch.upNext')}</h3>
       <div class="seg" role="group" aria-label=${t('watch.afterThis')}>
-        ${MODES.map(([k, label, icon]) => html`<button class=${mode === k ? 'on' : ''} title=${t(label)} aria-label=${t(label)}
+        ${modes.map(([k, label, icon]) => html`<button class=${mode === k ? 'on' : ''} title=${t(label)} aria-label=${t(label)}
           onClick=${() => setMode(k)}><${Icon} name=${icon} size="18" /></button>`)}
       </div></div>
-    <div class="small muted">${t(MODES.find((m) => m[0] === mode)[1])}${mode === 'channel' ? t('watch.channelOdds') : ''}</div>
+    <div class="small muted">${t((modes.find((m) => m[0] === mode) || MODES[0])[1])}${mode === 'channel' ? t('watch.channelOdds') : ''}</div>
+    ${mode === 'playlist' && playlistPart}
     ${mode === 'channel' && (pick
       ? html`<${VideoCard} v=${pick} showChannel=${false} />
           <div class="row"><button class="small" onClick=${reroll}><${Icon} name="refresh" size="16" /> ${t('watch.reroll')}</button>
@@ -111,11 +150,16 @@ function NotCached({ id, video, reload }) {
     </div></div>`;
 }
 
-export function Watch({ id }) {
+export function Watch({ id, list }) {
   const [video, setVideo] = useState(null);
   const [error, setError] = useState(null);
   const [time, setTime] = useState(0);
-  const [mode, setModeState] = useState(() => prefs().nextMode);
+  const [mode, setModeState] = useState(() => (list ? 'playlist' : savedMode()));
+  const [playlist, setPlaylist] = useState(null);
+  const [shuffle, setShuffle] = useState(() => !!prefs().playlistShuffle);
+  const [plRoll, setPlRoll] = useState(0); // bumped to draw another shuffled pick
+  const plSkipped = useRef([]);
+  const [adding, setAdding] = useState(false);
   const [pick, setPick] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [theatre, setTheatreState] = useState(() => !!prefs().theatre);
@@ -145,6 +189,30 @@ export function Watch({ id }) {
 
   useEffect(() => { firstLoad.current = true; load(); addPlayed(id); skipped.current = []; window.scrollTo({ top: 0 }); }, [id, profile?.id]);
 
+  // Playing from a playlist: follow it (reloaded per video, as its items get cached meanwhile).
+  useEffect(() => {
+    if (!list) { setPlaylist(null); setModeState((m) => (m === 'playlist' ? savedMode() : m)); return; }
+    let alive = true;
+    get('/playlists/' + list).then((p) => alive && setPlaylist(p)).catch(() => alive && setPlaylist(null));
+    setPlaylistPlayed(list, [...playlistPlayed(list).filter((x) => x !== id), id]);
+    plSkipped.current = [];
+    return () => { alive = false; };
+  }, [list, id, profile?.id]);
+  useEffect(() => { if (list) setModeState('playlist'); }, [list]);
+
+  // The playlist's next video: the next cached one in order, or (shuffled) one not yet played this time round.
+  const plNext = useMemo(() => {
+    if (!playlist) return null;
+    const items = playlist.items;
+    if (shuffle) {
+      const done = new Set([...playlistPlayed(playlist.id), ...plSkipped.current, id]);
+      const fresh = items.filter((v) => v.state === 'cached' && !done.has(v.id));
+      return fresh.length ? fresh[Math.floor(Math.random() * fresh.length)] : null;
+    }
+    const at = items.findIndex((v) => v.id === id);
+    return items.slice(at + 1).find((v) => v.state === 'cached') || null;
+  }, [playlist, id, shuffle, plRoll]);
+
   // Poll while queued/downloading.
   useEffect(() => {
     if (!video || !['queued', 'downloading'].includes(video.state)) return;
@@ -161,7 +229,10 @@ export function Watch({ id }) {
   }, [id, video?.state]);
   useEffect(() => { if (mode === 'channel') fetchPick(); }, [id, mode, video?.state]);
 
-  function setMode(m) { setModeState(m); setPref('nextMode', m); }
+  function setMode(m) { setModeState(m); if (m !== 'playlist') setPref('nextMode', m); }
+  function toggleShuffle() { const on = !shuffle; setShuffle(on); setPref('playlistShuffle', on); }
+  function plReroll() { if (plNext) plSkipped.current.push(plNext.id); setPlRoll((n) => n + 1); }
+  function plRestart() { setPlaylistPlayed(list, [id]); plSkipped.current = []; setPlRoll((n) => n + 1); }
   function reroll() {
     if (pick) {
       skipped.current.push(pick.id);
@@ -173,7 +244,9 @@ export function Watch({ id }) {
   // Theatre: the player takes the full width and Hereafter moves below (only where it would sit beside).
   function toggleTheatre() { const on = !theatre; setTheatreState(on); setPref('theatre', on); }
   function playNext() {
-    if (mode === 'queue') {
+    if (mode === 'playlist') {
+      if (plNext) go('/watch/' + plNext.id, { list });
+    } else if (mode === 'queue') {
       const q = getQueue();
       if (!q.length) return;
       const [first, ...rest] = q;
@@ -205,7 +278,7 @@ export function Watch({ id }) {
       ${cached
         ? html`<${Player} video=${video} api=${playerApi} autoplay=${autoplay.current} onEnded=${onEnded} onTime=${setTime}
             theatre=${theatre} onTheatre=${toggleTheatre}
-            onNext=${(mode === 'channel' && pick) || (mode === 'queue' && queue.length) ? playNext : null} />`
+            onNext=${(mode === 'channel' && pick) || (mode === 'queue' && queue.length) || (mode === 'playlist' && plNext) ? playNext : null} />`
         : html`<${NotCached} id=${id} video=${video.missing && !video.title ? null : video} reload=${load} />`}
       <h1 class="watch-title">${video.title || id}</h1>
       <div class="row wrap small muted" style="margin-top:0.35rem">
@@ -222,6 +295,7 @@ export function Watch({ id }) {
       <div class="row wrap" style="margin:0.7rem 0">
         ${cached && html`<button class="small" onClick=${togglePin}><${Icon} name="pin" size="16" /> ${video.pinned ? t('watch.unpin') : t('watch.pin')}</button>`}
         ${cached && html`<button class="small" onClick=${() => enqueue(video)}><${Icon} name="plus" size="16" /> ${t('watch.addToQueue')}</button>`}
+        ${video.title && html`<button class="small" onClick=${() => setAdding(true)}><${Icon} name="playlist" size="16" /> ${t('playlist.addToPlaylist')}</button>`}
         ${cached && html`<button class="small danger" onClick=${() => setConfirmDelete(true)}><${Icon} name="trash" size="16" /> ${t('watch.removeFile')}</button>`}
         <a class="btn small" href=${`https://www.youtube.com/watch?v=${id}`} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size="16" /> ${t('watch.youtube')}</a>
       </div>
@@ -229,9 +303,13 @@ export function Watch({ id }) {
       <${Description} text=${video.description} onSeek=${seek} />
     </div>
     <aside class="stack">
-      ${cached && html`<${UpNext} video=${video} mode=${mode} setMode=${setMode} pick=${pick} reroll=${reroll} playNext=${playNext} queue=${queue} />`}
+      ${(cached || (mode === 'playlist' && playlist)) && html`<${UpNext} video=${video} modes=${list ? [PLAYLIST_MODE, ...MODES] : MODES}
+        mode=${mode} setMode=${setMode} pick=${pick} reroll=${reroll} playNext=${playNext} queue=${queue}
+        playlistPart=${playlist && html`<${PlaylistUpNext} playlist=${playlist} id=${id} next=${plNext} shuffle=${shuffle}
+          toggleShuffle=${toggleShuffle} reroll=${plReroll} restart=${plRestart} playNext=${playNext} />`} />`}
       <${Chapters} chapters=${video.chapters} time=${time} onSeek=${seek} />
     </aside>
+    ${adding && html`<${AddToPlaylist} video=${video} onClose=${() => setAdding(false)} />`}
     ${confirmDelete && html`<${Confirm} title=${t('watch.removeTitle')} danger confirmLabel=${t('watch.removeConfirm')}
       message=${t('watch.removeMessage')}
       onConfirm=${deleteFiles} onClose=${() => setConfirmDelete(false)} />`}

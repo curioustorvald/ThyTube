@@ -21,12 +21,13 @@ export function VideoBadges({ v, showState = false }) {
   return badges.length ? html`<div class="vbadges">${badges}</div>` : null;
 }
 
-export function VideoCard({ v, sub, showChannel = true, onClick, extra }) {
+// `to`: where the card leads, when not simply to the video (e.g. the video within a playlist).
+export function VideoCard({ v, sub, showChannel = true, onClick, extra, to }) {
   const frac = progressFraction(v);
   const unwatched = v.me && !v.me.watch_count && !frac && v.state === 'cached';
   const line = [showChannel && v.channel?.title, v.published_at && ago(v.published_at)].filter(Boolean).join(' · ');
   return html`
-    <a class="vcard ${v.state === 'evicted' ? 'dim' : ''}" href=${href('/watch/' + v.id)} onClick=${onClick}>
+    <a class="vcard ${v.state === 'evicted' ? 'dim' : ''}" href=${to || href('/watch/' + v.id)} onClick=${onClick}>
       <div class="thumb">
         <img src=${v.thumb} alt="" loading="lazy" decoding="async" />
         ${unwatched && html`<span class="new-dot" title=${t('badge.unwatched')}></span>`}

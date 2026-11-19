@@ -15,6 +15,7 @@ from ...health import Health, explain
 from ...pool import Pool
 from .. import yt
 from ..common import ApiError, check_video_id, get_cfg, get_conn, profile_id, video_json, video_select
+from .playlists import youtube_preview
 
 router = APIRouter()
 
@@ -235,8 +236,12 @@ async def resolve(url: str, cfg: Config = Depends(get_cfg)) -> dict[str, Any]:
     if parsed is None:
         raise ApiError(422, "not_youtube", "that doesn't look like a YouTube video or channel link")
     kind, value = parsed
+    if kind == "playlist":
+        listing = await yt.playlist_listing(cfg, value)
     conn = db.connect(cfg.db_path)
     try:
+        if kind == "playlist":
+            return {"type": "playlist", "playlist": youtube_preview(conn, listing)}
         if kind == "video":
             row = conn.execute(video_select(False) + " WHERE v.id=:id", {"id": value}).fetchone()
             if row is not None and row["title"]:

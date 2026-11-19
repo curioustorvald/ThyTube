@@ -42,6 +42,10 @@ def channel_url(channel_id: str, tab: str = "videos") -> str:
     return f"https://www.youtube.com/channel/{channel_id}/{tab}"
 
 
+def playlist_url(playlist_id: str) -> str:
+    return f"https://www.youtube.com/playlist?list={playlist_id}"
+
+
 @dataclass
 class RunResult:
     argv: list[str]

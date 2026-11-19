@@ -47,6 +47,7 @@ export async function api(path, { method = 'GET', body, signal, query } = {}) {
 export const get = (path, query, opts = {}) => api(path, { ...opts, query });
 export const post = (path, body) => api(path, { method: 'POST', body: body ?? {} });
 export const patch = (path, body) => api(path, { method: 'PATCH', body });
+export const put = (path, body) => api(path, { method: 'PUT', body });
 export const del = (path, query) => api(path, { method: 'DELETE', query });
 
 // For pagehide: sendBeacon can't set headers, so the profile goes in the body.
